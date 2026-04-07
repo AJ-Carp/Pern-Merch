@@ -5,9 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 public class PernMerchWebsiteApplication {
-
 	public static void main(String[] args) {
 		SpringApplication.run(PernMerchWebsiteApplication.class, args);
 	}
-
 }
