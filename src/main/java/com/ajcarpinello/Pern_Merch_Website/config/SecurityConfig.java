@@ -1,6 +1,5 @@
 package com.ajcarpinello.Pern_Merch_Website.config;
 
-import com.ajcarpinello.Pern_Merch_Website.config.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
