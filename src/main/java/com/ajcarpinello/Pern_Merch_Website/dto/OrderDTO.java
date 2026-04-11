@@ -18,5 +18,5 @@ public class OrderDTO {
     private LocalDateTime orderDate;
     private BigDecimal totalAmount;
     private String status;
-    private List<com.ajcarpinello.Pern_Merch_Website.dto.OrderItemDTO> items;
+    private List<OrderItemDTO> items;
 }
