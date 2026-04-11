@@ -48,6 +48,4 @@ public class Order {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
-
-    // learn commented parts and continue implementing entities, dont commit this comment
 }
