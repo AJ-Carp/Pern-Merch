@@ -35,18 +35,28 @@ public class OrderService {
         Order order = new Order();
         BigDecimal priceSum = BigDecimal.ZERO;
         for (CartItem cartItem : cartItems) {
-            if (cartItem.getQuantity() > cartItem.getProduct().getStockQuantity()) {
-                throw new RuntimeException("Not enough stock for: " + cartItem.getProduct().getName());
+            /* Re-fetch the product with a pessimistic lock so no other transaction
+               can modify its stock until this checkout transaction completes. */
+            // prevents a race condition where both users purchase an item when there's only one left
+            Product product = productRepository.findByIdForUpdate(cartItem.getProduct().getId())
+                    .orElseThrow(() -> new RuntimeException("Product no longer exists"));
+
+            if (cartItem.getQuantity() > product.getStockQuantity()) {
+                throw new RuntimeException("Not enough stock for: " + product.getName());
             }
-            cartItem.getProduct().setStockQuantity(cartItem.getProduct().getStockQuantity() - cartItem.getQuantity());
-            productRepository.save(cartItem.getProduct());
+            product.setStockQuantity(product.getStockQuantity() - cartItem.getQuantity());
+
+            /* If we fetch an existing entity inside a @Transactional method and
+               modify any of its fields, JPA automatically issues an UPDATE when the transaction commits (method ends). */
+            // so we dont need to save product
+
             OrderItem orderItem = OrderItem.builder()
                     .order(order)
-                    .product(cartItem.getProduct())
+                    .product(product)
                     .quantity(cartItem.getQuantity())
-                    .priceAtPurchase(cartItem.getProduct().getPrice()).build();
+                    .priceAtPurchase(product.getPrice()).build();
             order.getItems().add(orderItem);
-            BigDecimal itemTotal = cartItem.getProduct().getPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+            BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity()));
             priceSum = priceSum.add(itemTotal);
         }
         order.setUser(user);
