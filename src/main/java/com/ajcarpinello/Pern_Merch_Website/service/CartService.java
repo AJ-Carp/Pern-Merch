@@ -34,13 +34,19 @@ public class CartService {
     }
 
     public CartItemDTO addToCart(String username, Long productId, int quantity) {
-        User user = findUser(username);
         Product product = productRepository.findById(productId).orElseThrow(() -> new RuntimeException("Product Id not found"));
+        if (product.getStockQuantity() < quantity) {
+            throw new RuntimeException("Not enough items in stock for: " + product.getName());
+        }
+        User user = findUser(username);
 
         Optional<CartItem> cartItemOptional = cartItemRepository.findByUserAndProductId(user, productId);
         CartItem cartItem;
         if (cartItemOptional.isPresent()) {
             cartItem = cartItemOptional.get();
+            if (product.getStockQuantity() < cartItem.getQuantity() + quantity) {
+                throw new RuntimeException("Not enough items in stock for: " + product.getName());
+            }
             cartItem.setQuantity(cartItem.getQuantity() + quantity);
         } else {
             cartItem = CartItem.builder()
@@ -58,6 +64,10 @@ public class CartService {
 
         if (!cartItem.getUser().getUsername().equals(username)) {
             throw new RuntimeException("Unauthorized");
+        }
+
+        if (cartItem.getProduct().getStockQuantity() < quantity) {
+            throw new RuntimeException("Not enough items in stock for: " + cartItem.getProduct().getName());
         }
 
         if (quantity <= 0) {
@@ -103,6 +113,8 @@ public class CartService {
                 .productImageUrl(cartItem.getProduct().getImageUrl())
                 .productPrice(cartItem.getProduct().getPrice())
                 .size(cartItem.getProduct().getSize())
-                .quantity(cartItem.getQuantity()).build();
+                .quantity(cartItem.getQuantity())
+                .stockQuantity(cartItem.getProduct().getStockQuantity())
+                .build();
     }
 }

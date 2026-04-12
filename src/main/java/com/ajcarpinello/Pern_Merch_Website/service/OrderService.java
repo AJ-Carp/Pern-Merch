@@ -5,6 +5,7 @@ import com.ajcarpinello.Pern_Merch_Website.dto.OrderItemDTO;
 import com.ajcarpinello.Pern_Merch_Website.entity.*;
 import com.ajcarpinello.Pern_Merch_Website.repository.CartItemRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.OrderRepository;
+import com.ajcarpinello.Pern_Merch_Website.repository.ProductRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final CartItemRepository cartItemRepository;
     private final OrderRepository orderRepository;
+    private final ProductRepository productRepository;
 
     // @Transactional ensures that saving the order and clearing the cart happen as an "all-or-nothing" operation.
     // If one step fails (e.g. database error), everything rolls back, preventing inconsistent states.
@@ -33,6 +35,11 @@ public class OrderService {
         Order order = new Order();
         BigDecimal priceSum = BigDecimal.ZERO;
         for (CartItem cartItem : cartItems) {
+            if (cartItem.getQuantity() > cartItem.getProduct().getStockQuantity()) {
+                throw new RuntimeException("Not enough stock for: " + cartItem.getProduct().getName());
+            }
+            cartItem.getProduct().setStockQuantity(cartItem.getProduct().getStockQuantity() - cartItem.getQuantity());
+            productRepository.save(cartItem.getProduct());
             OrderItem orderItem = OrderItem.builder()
                     .order(order)
                     .product(cartItem.getProduct())
