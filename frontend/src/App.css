@@ -5,6 +5,7 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 :root {
@@ -30,6 +31,7 @@ body {
   background: var(--bg-dark);
   color: var(--text);
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 a { color: var(--accent); text-decoration: none; }
@@ -595,6 +597,7 @@ img { max-width: 100%; display: block; }
   }
   .duo-section {
     padding: 48px 0;
+    text-align: center;
   }
 
   /* Hide desktop nav links */
