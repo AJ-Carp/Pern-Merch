@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.Map;
 
+// this class acts like a globalized catch block for the whole app
+
 // @RestControllerAdvice intercepts exceptions thrown by any controller in the app
 // and converts them into clean JSON responses instead of ugly HTML error pages.
 // This gives the frontend a predictable error format it can display to the user.

@@ -1,0 +1,33 @@
+services:
+  app:
+    image: pern-merch-backend
+
+    environment:
+      POSTGRES_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-pern-merch}
+      POSTGRES_USERNAME: ${POSTGRES_USERNAME:?missing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?missing}
+      JWT_SECRET: ${JWT_SECRET:?missing}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?missing}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?missing}
+
+    ports: 
+      - 8080:8080
+
+    depends_on:
+      - postgres
+
+
+  postgres:
+    image: postgres:16  
+
+    environment:
+      # use -pern-merch if no POSTGRES_DB env variable
+      POSTGRES_DB: ${POSTGRES_DB:-pern-merch}
+      POSTGRES_USER: ${POSTGRES_USERNAME:?missing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?missing}
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:
