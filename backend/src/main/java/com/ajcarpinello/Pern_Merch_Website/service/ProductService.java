@@ -2,8 +2,10 @@ package com.ajcarpinello.Pern_Merch_Website.service;
 
 import com.ajcarpinello.Pern_Merch_Website.dto.ProductDTO;
 import com.ajcarpinello.Pern_Merch_Website.entity.Product;
+import com.ajcarpinello.Pern_Merch_Website.exception.AppException;
 import com.ajcarpinello.Pern_Merch_Website.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -26,7 +28,7 @@ public class ProductService {
     }
 
     public ProductDTO getProduct(Long id) {
-        Product product = productRepository.findById(id).orElseThrow(() -> new RuntimeException("Product id not found"));
+        Product product = productRepository.findById(id).orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Product not found"));
         return toDTO(product);
     }
 
@@ -43,7 +45,7 @@ public class ProductService {
     }
 
     public ProductDTO updateProduct(Long id, ProductDTO dto) {
-        Product product = productRepository.findById(id).orElseThrow(() -> new RuntimeException("Product id not found"));
+        Product product = productRepository.findById(id).orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Product not found"));
         product.setName(dto.getName());
         product.setDescription(dto.getDescription());
         product.setPrice(dto.getPrice());

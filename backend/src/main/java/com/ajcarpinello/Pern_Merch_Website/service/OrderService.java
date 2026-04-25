@@ -3,11 +3,13 @@ package com.ajcarpinello.Pern_Merch_Website.service;
 import com.ajcarpinello.Pern_Merch_Website.dto.OrderDTO;
 import com.ajcarpinello.Pern_Merch_Website.dto.OrderItemDTO;
 import com.ajcarpinello.Pern_Merch_Website.entity.*;
+import com.ajcarpinello.Pern_Merch_Website.exception.AppException;
 import com.ajcarpinello.Pern_Merch_Website.repository.CartItemRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.OrderRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.ProductRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -30,7 +32,7 @@ public class OrderService {
     @Transactional
     public OrderDTO checkout(String username) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Username does not exist"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
         List<CartItem> cartItems = cartItemRepository.findByUser(user);
         Order order = new Order();
         BigDecimal priceSum = BigDecimal.ZERO;
@@ -39,10 +41,10 @@ public class OrderService {
                can modify its stock until this checkout transaction completes. */
             // prevents a race condition where both users purchase an item when there's only one left
             Product product = productRepository.findByIdForUpdate(cartItem.getProduct().getId())
-                    .orElseThrow(() -> new RuntimeException("Product no longer exists"));
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Product no longer exists"));
 
             if (cartItem.getQuantity() > product.getStockQuantity()) {
-                throw new RuntimeException("Not enough stock for: " + product.getName());
+                throw new AppException(HttpStatus.BAD_REQUEST, "Not enough stock for: " + product.getName());
             }
             product.setStockQuantity(product.getStockQuantity() - cartItem.getQuantity());
 
@@ -70,7 +72,7 @@ public class OrderService {
 
     public List<OrderDTO> getOrderHistory(String username) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Username not found"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
         List<Order> orders = orderRepository.findByUserOrderByOrderDateDesc(user);
         List<OrderDTO> orderDTOS = new ArrayList<>();
         for (Order order : orders) {

@@ -4,11 +4,13 @@ import com.ajcarpinello.Pern_Merch_Website.dto.CartItemDTO;
 import com.ajcarpinello.Pern_Merch_Website.entity.CartItem;
 import com.ajcarpinello.Pern_Merch_Website.entity.Product;
 import com.ajcarpinello.Pern_Merch_Website.entity.User;
+import com.ajcarpinello.Pern_Merch_Website.exception.AppException;
 import com.ajcarpinello.Pern_Merch_Website.repository.CartItemRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.ProductRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -34,9 +36,9 @@ public class CartService {
     }
 
     public CartItemDTO addToCart(String username, Long productId, int quantity) {
-        Product product = productRepository.findById(productId).orElseThrow(() -> new RuntimeException("Product Id not found"));
+        Product product = productRepository.findById(productId).orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Product not found"));
         if (product.getStockQuantity() < quantity) {
-            throw new RuntimeException("Not enough items in stock for: " + product.getName());
+            throw new AppException(HttpStatus.BAD_REQUEST, "Not enough items in stock for: " + product.getName());
         }
         User user = findUser(username);
 
@@ -45,7 +47,7 @@ public class CartService {
         if (cartItemOptional.isPresent()) {
             cartItem = cartItemOptional.get();
             if (product.getStockQuantity() < cartItem.getQuantity() + quantity) {
-                throw new RuntimeException("Not enough items in stock for: " + product.getName());
+                throw new AppException(HttpStatus.BAD_REQUEST, "Not enough items in stock for: " + product.getName());
             }
             cartItem.setQuantity(cartItem.getQuantity() + quantity);
         } else {
@@ -60,14 +62,14 @@ public class CartService {
 
     public CartItemDTO updateQuantity(String username, Long cartItemId, Integer quantity) {
         CartItem cartItem = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new RuntimeException("Cart item not found"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Cart item not found"));
 
         if (!cartItem.getUser().getUsername().equals(username)) {
-            throw new RuntimeException("Unauthorized");
+            throw new AppException(HttpStatus.FORBIDDEN, "Access denied");
         }
 
         if (cartItem.getProduct().getStockQuantity() < quantity) {
-            throw new RuntimeException("Not enough items in stock for: " + cartItem.getProduct().getName());
+            throw new AppException(HttpStatus.BAD_REQUEST, "Not enough items in stock for: " + cartItem.getProduct().getName());
         }
 
         if (quantity <= 0) {
@@ -82,10 +84,10 @@ public class CartService {
 
     public void removeFromCart(String username, Long cartItemId) {
         CartItem cartItem = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new RuntimeException("cartItemId not found"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Cart item not found"));
 
         if (!cartItem.getUser().getUsername().equals(username)) {
-            throw new RuntimeException("Unauthorized");
+            throw new AppException(HttpStatus.FORBIDDEN, "Access denied");
         }
         cartItemRepository.delete(cartItem);
     }

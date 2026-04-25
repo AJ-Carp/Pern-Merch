@@ -6,8 +6,10 @@ import com.ajcarpinello.Pern_Merch_Website.dto.LoginRequest;
 import com.ajcarpinello.Pern_Merch_Website.dto.RegisterRequest;
 import com.ajcarpinello.Pern_Merch_Website.entity.Role;
 import com.ajcarpinello.Pern_Merch_Website.entity.User;
+import com.ajcarpinello.Pern_Merch_Website.exception.AppException;
 import com.ajcarpinello.Pern_Merch_Website.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -27,10 +29,10 @@ public class AuthService {
 
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new RuntimeException("Username already exists");
+            throw new AppException(HttpStatus.CONFLICT, "Username already exists");
         }
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists");
+            throw new AppException(HttpStatus.CONFLICT, "Email already exists");
         }
 
         User user = User.builder()
@@ -50,7 +52,7 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest request) {
         authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
-        User user = userRepository.findByUsername(request.getUsername()).orElseThrow(() -> new RuntimeException("User not found"));
+        User user = userRepository.findByUsername(request.getUsername()).orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
         String token = jwtUtil.generateToken(userDetails);
         return new AuthResponse(token, user.getUsername(), user.getRole().name());
