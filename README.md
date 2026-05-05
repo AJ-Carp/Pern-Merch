@@ -1,58 +1,51 @@
 # Pern-Merch
 
-## Deployment Strategy (Cheap but Professional)
+## Deployment Strategy (Lean and Professional)
 
 ### Planned Architecture
 
-1. EC2 (single Linux server) running Docker containers
-2. Spring Boot API + PostgreSQL on the same EC2 instance
-3. React frontend built and hosted on S3
-4. CloudFront in front of S3 for CDN + HTTPS delivery
+1. React frontend built and hosted on S3
+2. CloudFront in front of S3 for CDN + HTTPS delivery
+3. Spring Boot API deployed on ECS (Fargate Express mode)
+4. Managed PostgreSQL on Neon
 
 ### Why This Is Beneficial
 
 1. Low monthly cost
-	This avoids paying for multiple managed services early. For launch-stage traffic, this is one of the cheapest AWS setups that still looks and behaves like a real production deployment.
+	Uses managed services and small task sizes, keeping costs low for early-stage traffic.
 
 2. Professional deployment pattern
-	You still get production fundamentals: containerized backend, isolated frontend hosting, CDN caching, HTTPS, and environment-based configuration.
+	Static frontend on a CDN, containerized backend, and managed database are standard production choices.
 
-3. Simple to operate as a beginner
-	One server is much easier to manage than a multi-service architecture when you are learning deployment and operations.
+3. Easy to operate as a beginner
+	Each component is managed and isolated, with minimal server maintenance.
 
 4. Good performance for low-to-moderate traffic
-	CloudFront serves static assets quickly and reduces load on origin infrastructure. The backend and DB on one box is usually fine in early launch.
+	CloudFront caches assets globally, and the API runs in a dedicated container environment.
 
 5. Easy upgrade path later
-	When traffic grows, this architecture can evolve gradually:
-	- move PostgreSQL to RDS
-	- add load balancing
-	- split backend into multiple instances
+	Scale ECS tasks, add a load balancer, or migrate the database to a larger plan as traffic grows.
 
 ### Cost Expectation
 
-- Typical range: about $13 to $30 per month
-- Best case: can be near free-tier or close to $10/month for light usage
+- Typical range: about $12 to $30 per month (lean sizes + free DB tier)
+- Higher if you add a load balancer, larger tasks, or higher traffic
 
 ### Tradeoffs (Known and Acceptable at Launch)
 
-1. Single server risk
-	If the EC2 instance fails, API and DB are both affected.
+1. Small task sizes
+	A 0.25 vCPU / 0.5 GB task can be tight for Java under load.
 
-2. More manual operations
-	Backups, monitoring, and updates are your responsibility.
-
-3. Limited immediate scaling
-	This is not designed for high traffic from day one.
+2. Managed service limits
+	Free database tiers have connection and storage limits.
 
 ### Minimum Production Safeguards
 
-1. Automated PostgreSQL backups to S3
-2. Tight security groups (no public DB access)
-3. HTTPS everywhere
-4. Basic CloudWatch monitoring and alerts
-5. Recovery checklist for redeploy/restore
+1. HTTPS everywhere (CloudFront + API endpoint)
+2. Secrets stored in a manager (not plain env vars)
+3. DB SSL enabled in the JDBC URL
+4. Basic monitoring and alerts
 
 ## Project Goal
 
-This project intentionally starts with a lean, budget-conscious AWS architecture that is suitable for early production while keeping future scaling options open.
+This project uses a lean, production-grade AWS architecture with a managed database, keeping costs low while staying scalable.
