@@ -1,4 +1,4 @@
-const BASE_URL = '/api';
+const BASE_URL = 'https://pe-caa7334a460c428f9116b67c92a1eda8.ecs.us-east-1.on.aws/api';
 
 function getToken() {
   return localStorage.getItem('token');
