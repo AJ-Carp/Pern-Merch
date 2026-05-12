@@ -84,16 +84,6 @@ public class DataSeeder implements CommandLineRunner {
                     .build());
 
             productRepository.save(Product.builder()
-                    .name("PERN Enamel Pin Set")
-                    .description("Set of 3 collectible enamel pins.")
-                    .price(new BigDecimal("12.99"))
-                    .category("Accessories")
-                    .size("ONE_SIZE")
-                    .imageUrl("https://via.placeholder.com/400x400/16213e/53d8fb?text=Pin+Set")
-                    .stockQuantity(75)
-                    .build());
-
-            productRepository.save(Product.builder()
                     .name("PERN Beanie")
                     .description("Embroidered knit beanie. One size fits all.")
                     .price(new BigDecimal("19.99"))
@@ -103,7 +93,7 @@ public class DataSeeder implements CommandLineRunner {
                     .stockQuantity(40)
                     .build());
 
-            System.out.println(">>> Seeded 8 dummy products (dev profile)");
+                        System.out.println(">>> Seeded 7 dummy products (dev profile)");
         }
     }
 }

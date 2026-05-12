@@ -510,6 +510,7 @@ img { max-width: 100%; display: block; }
   margin-right: 16px;
 }
 .status-confirmed { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }
+.status-paid { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }
 .status-pending { background: rgba(241, 196, 15, 0.2); color: #f1c40f; }
 .status-shipped { background: rgba(83, 216, 251, 0.2); color: var(--cyan); }
 .status-delivered { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }

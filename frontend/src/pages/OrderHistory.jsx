@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import { getOrders } from '../api/api';
 
+const STATUS_LABELS = {
+  PAID: 'Paid',
+  CONFIRMED: 'Confirmed',
+  SHIPPED: 'Shipped',
+  DELIVERED: 'Delivered',
+  CANCELLED: 'Cancelled',
+};
+
 export default function OrderHistory() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +40,9 @@ export default function OrderHistory() {
                   <span className="order-date">{new Date(order.orderDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                 </div>
                 <div>
-                  <span className={`order-status status-${order.status.toLowerCase()}`}>{order.status}</span>
+                  <span className={`order-status status-${order.status.toLowerCase()}`}>
+                    {STATUS_LABELS[order.status] || order.status}
+                  </span>
                   <span className="order-total">${order.totalAmount?.toFixed(2)}</span>
                 </div>
               </div>

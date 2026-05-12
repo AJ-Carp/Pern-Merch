@@ -1,4 +1,5 @@
-const BASE_URL = 'https://pe-caa7334a460c428f9116b67c92a1eda8.ecs.us-east-1.on.aws/api';
+//const BASE_URL = 'https://pe-caa7334a460c428f9116b67c92a1eda8.ecs.us-east-1.on.aws/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
 function getToken() {
   return localStorage.getItem('token');
@@ -112,7 +113,7 @@ export async function removeCartItem(cartItemId) {
 
 // ---- Orders ----
 
-export async function checkout() {
+export async function createPaymentIntent() {
   const res = await fetch(`${BASE_URL}/orders/checkout`, {
     method: 'POST',
     headers: authHeaders(),

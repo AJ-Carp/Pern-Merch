@@ -1,11 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { checkout } from '../api/api';
 
 export default function Cart() {
-  const { cartItems, cartCount, loading, loadCart, updateQuantity, removeItem, clearLocalCart } = useCart();
-  const [checkingOut, setCheckingOut] = useState(false);
+  const { cartItems, cartCount, loading, loadCart, updateQuantity, removeItem } = useCart();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,17 +21,7 @@ export default function Cart() {
   }
 
   async function handleCheckout() {
-    setCheckingOut(true);
-    try {
-      await checkout();
-      clearLocalCart();
-      alert('Order placed successfully!');
-      navigate('/orders');
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setCheckingOut(false);
-    }
+    navigate('/checkout');
   }
 
   if (loading) return <p className="loading-text">Loading cart...</p>;
@@ -73,8 +61,8 @@ export default function Cart() {
               <span>Total:</span>
               <span className="cart-total-price">${total.toFixed(2)}</span>
             </div>
-            <button className="btn btn-primary btn-lg" onClick={handleCheckout} disabled={checkingOut}>
-              {checkingOut ? 'Processing...' : 'Checkout'}
+            <button className="btn btn-primary btn-lg" onClick={handleCheckout}>
+              Checkout
             </button>
           </div>
         </>

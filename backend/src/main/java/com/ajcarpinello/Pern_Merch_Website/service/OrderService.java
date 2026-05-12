@@ -15,13 +15,16 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 
 @Service
 @RequiredArgsConstructor
 public class OrderService {
 
-    private final CartService cartService;
     private final UserRepository userRepository;
     private final CartItemRepository cartItemRepository;
     private final OrderRepository orderRepository;
@@ -30,10 +33,29 @@ public class OrderService {
     // @Transactional ensures that saving the order and clearing the cart happen as an "all-or-nothing" operation.
     // If one step fails (e.g. database error), everything rolls back, preventing inconsistent states.
     @Transactional
-    public OrderDTO checkout(String username) {
+    public Order createPendingOrder(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
+        
         List<CartItem> cartItems = cartItemRepository.findByUser(user);
+        if (cartItems.isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Cart is empty");
+        }
+
+        // idempotent — calling it multiple times has the same effect as calling it once.
+        // Idempotency: reuse existing pending order if cart hasn't changed,
+        // otherwise cancel it and create a fresh one.
+        Optional<Order> existing = orderRepository
+                .findFirstByUserAndStatusOrderByOrderDateDesc(user, OrderStatus.PENDING_PAYMENT);
+        if (existing.isPresent() && cartMatchesOrder(user, existing.get())) {
+            return existing.get();
+        }
+        // Cart changed since last attempt — cancel the stale pending order
+        // If it already has a Stripe intent, cancel that first in PaymentService.
+        if (existing.isPresent()) {
+            this.cancelAndReleaseStockInternal(existing.get());
+        }
+
         Order order = new Order();
         BigDecimal priceSum = BigDecimal.ZERO;
         for (CartItem cartItem : cartItems) {
@@ -64,10 +86,59 @@ public class OrderService {
         order.setUser(user);
         order.setOrderDate(LocalDateTime.now());
         order.setTotalAmount(priceSum);
-        order.setStatus(OrderStatus.PENDING);
+        order.setStatus(OrderStatus.PENDING_PAYMENT);
+        return orderRepository.save(order);
+    }
+
+    /**
+     * Saves the Stripe PaymentIntent ID onto the order. Separate short transaction
+     * so it can run after the (network) Stripe API call.
+     */
+    @Transactional
+    public void attachPaymentIntent(Long orderId, String paymentIntentId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
+        order.setStripePaymentIntentId(paymentIntentId);
         orderRepository.save(order);
-        cartService.clearCart(username);
-        return toOrderDTO(order);
+    }
+
+    /**
+     * Compensating transaction: release stock, mark order CANCELLED.
+     * Called when Stripe intent creation fails.
+     */
+    @Transactional
+    public void cancelAndReleaseStock(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
+        cancelAndReleaseStockInternal(order);
+    }
+
+    private void cancelAndReleaseStockInternal(Order order) {
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) return; // already handled
+        for (OrderItem item : order.getItems()) {
+            Product product = productRepository.findByIdForUpdate(item.getProduct().getId())
+                    .orElseThrow();
+            product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
+        }
+        order.setStatus(OrderStatus.CANCELLED);
+        orderRepository.save(order);
+    }
+
+    /** Cart contents (productId + quantity) match the order's items exactly. */
+    private boolean cartMatchesOrder(User user, Order order) {
+        List<CartItem> cartItems = cartItemRepository.findByUser(user);
+        if (cartItems.size() != order.getItems().size()) return false;
+
+        Map<Long, Integer> cartMap = new HashMap<>();
+        for (CartItem ci : cartItems) {
+            cartMap.put(ci.getProduct().getId(), ci.getQuantity());
+        }
+
+        for (OrderItem oi : order.getItems()) {
+            Integer cartQty = cartMap.get(oi.getProduct().getId());
+            if (cartQty == null || cartQty != oi.getQuantity()) return false;
+        }
+        return true;
     }
 
     public List<OrderDTO> getOrderHistory(String username) {
@@ -76,7 +147,9 @@ public class OrderService {
         List<Order> orders = orderRepository.findByUserOrderByOrderDateDesc(user);
         List<OrderDTO> orderDTOS = new ArrayList<>();
         for (Order order : orders) {
-            orderDTOS.add(toOrderDTO(order));
+            if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+                orderDTOS.add(toOrderDTO(order));
+            }
         }
         return orderDTOS;
     }
@@ -104,5 +177,4 @@ public class OrderService {
                 .quantity(orderItem.getQuantity())
                 .priceAtPurchase(orderItem.getPriceAtPurchase()).build();
     }
-
 }

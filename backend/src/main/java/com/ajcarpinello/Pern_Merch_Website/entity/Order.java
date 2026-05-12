@@ -40,6 +40,11 @@ public class Order {
     @Column(nullable = false)
     private OrderStatus status;
 
+    @Column(unique = true)
+    private String stripePaymentIntentId;
+
+    private LocalDateTime paidAt;
+
 
     // cascade - if we save a new order, the associated orderItems will also be saved
     // mappedBy references the foreign key in OrderItem. That foreign key references the order it belongs to

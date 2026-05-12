@@ -40,4 +40,5 @@ build/
 deployment learning plan.png
 backend deployment.png
 deployment plan.png
-
+stripe-elements-checklist.md
+stripe_payment_flow.svg
