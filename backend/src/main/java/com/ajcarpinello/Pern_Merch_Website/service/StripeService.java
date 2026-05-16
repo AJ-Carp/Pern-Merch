@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 
 @Service
 public class StripeService {
+
     @Value("${stripe.secret-key}") private String secretKey;
 
     @PostConstruct
@@ -30,6 +31,10 @@ public class StripeService {
                         .setEnabled(true).build())
                 .putMetadata("orderId", order.getId().toString())
                 .setDescription("Order #" + order.getId())
+                // could change to this, but user must not be loaded lazily
+                // .setDescription("Order Id: " + order.getId() + " | Customer username: " + 
+                //     order.getUser().getUsername() + " | Customer email: " + order.getUser().getEmail() +
+                //     " | Order items: " + order.getItems())
                 .build();
 
         // Idempotency key — Stripe returns the same intent if called twice with this key
@@ -40,6 +45,7 @@ public class StripeService {
         return PaymentIntent.create(params, opts);
     }
 
+    // stripe stores all paymentIntents made and we can fetch them via id
     public PaymentIntent retrievePaymentIntent(String id) throws StripeException {
         return PaymentIntent.retrieve(id);
     }

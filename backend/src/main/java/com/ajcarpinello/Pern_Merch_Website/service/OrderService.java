@@ -50,6 +50,7 @@ public class OrderService {
         if (existing.isPresent() && cartMatchesOrder(user, existing.get())) {
             return existing.get();
         }
+
         // Cart changed since last attempt — cancel the stale pending order
         // If it already has a Stripe intent, cancel that first in PaymentService.
         if (existing.isPresent()) {

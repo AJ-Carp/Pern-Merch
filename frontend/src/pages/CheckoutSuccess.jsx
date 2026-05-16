@@ -34,7 +34,9 @@ export default function CheckoutSuccess() {
       {status === 'succeeded' && (
         <>
           <h2>Payment received!</h2>
+          <br/>
           <p>Your order is being confirmed. It will appear in your order history shortly.</p>
+          <br/>
           <button className="btn btn-primary" onClick={() => navigate('/orders')}>
             View orders
           </button>

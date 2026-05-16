@@ -24,8 +24,8 @@ public class PaymentService {
     private final StripeService stripeService;
     private final ProcessedStripeEventRepository eventRepository;
 
-    public PaymentIntentResponse createPaymentIntent(String username) throws StripeException {
-        // Tx 1 (in OrderService): reserve stock + create or reuse pending order. Short.
+    public PaymentIntentResponse initiateCheckout(String username) throws StripeException {
+        // Transaction 1 (in OrderService): reserve stock + create or reuse pending order. Short.
         Order order = orderService.createPendingOrder(username);
 
         // If this is a reused order that already has an intent, verify it is still usable
@@ -39,7 +39,6 @@ public class PaymentService {
             }
         }
 
-        // Network call to Stripe — NO transaction active, NO DB locks held
         PaymentIntent intent;
         try {
             intent = stripeService.createPaymentIntent(order);
@@ -49,7 +48,7 @@ public class PaymentService {
             throw e;
         }
 
-        // Tx 2 (in OrderService): persist the intent ID
+        // Transaction 2 (in OrderService): persist the intent ID
         orderService.attachPaymentIntent(order.getId(), intent.getId());
         return new PaymentIntentResponse(intent.getClientSecret(), order.getId());
     }

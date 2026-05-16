@@ -11,7 +11,6 @@ import com.ajcarpinello.Pern_Merch_Website.service.PaymentService;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.model.Event;
 import com.stripe.net.Webhook;
-
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -26,15 +25,19 @@ public class StripeWebhookController {
     public ResponseEntity<String> handle(
             @RequestBody String payload,
             @RequestHeader("Stripe-Signature") String signature) {
+
         Event event;
         try {
             event = Webhook.constructEvent(payload, signature, webhookSecret);
         } catch (SignatureVerificationException e) {
             return ResponseEntity.status(400).body("Invalid signature");
         }
+
+        // stripe will keep sending the webhook over again unitl it gets a 200 or 400
         if (paymentService.isEventProcessed(event.getId())) {
             return ResponseEntity.ok("Already processed");
         }
+
         try {
             switch (event.getType()) {
                 case "payment_intent.succeeded" -> paymentService.handlePaymentSucceeded(event);

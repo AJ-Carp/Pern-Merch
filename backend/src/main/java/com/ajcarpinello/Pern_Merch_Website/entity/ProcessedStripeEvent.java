@@ -6,8 +6,12 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "processed_stripe_events")
-@Data @NoArgsConstructor @AllArgsConstructor @Builder
+@Data 
+@NoArgsConstructor 
+@AllArgsConstructor 
+@Builder
 public class ProcessedStripeEvent {
+    
     @Id
     private String eventId;
     private String eventType;

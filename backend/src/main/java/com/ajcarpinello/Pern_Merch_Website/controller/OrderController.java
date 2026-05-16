@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
 import java.util.List;
 
 @RestController
@@ -25,10 +24,9 @@ public class OrderController {
     private final PaymentService paymentService;
 
     @PostMapping("/checkout")
-public ResponseEntity<PaymentIntentResponse> checkout(@AuthenticationPrincipal UserDetails user)
-        throws StripeException {
-    return ResponseEntity.ok(paymentService.createPaymentIntent(user.getUsername()));
-}
+    public ResponseEntity<PaymentIntentResponse> checkout(@AuthenticationPrincipal UserDetails user) throws StripeException {
+        return ResponseEntity.ok(paymentService.initiateCheckout(user.getUsername()));
+    }
 
     @GetMapping
     public ResponseEntity<List<OrderDTO>> getOrderHistory(@AuthenticationPrincipal UserDetails userDetails) {
