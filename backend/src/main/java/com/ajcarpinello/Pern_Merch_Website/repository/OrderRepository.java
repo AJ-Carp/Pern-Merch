@@ -4,6 +4,7 @@ import com.ajcarpinello.Pern_Merch_Website.entity.Order;
 import com.ajcarpinello.Pern_Merch_Website.entity.OrderStatus;
 import com.ajcarpinello.Pern_Merch_Website.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,4 +15,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByStripePaymentIntentId(String stripePaymentIntentId);
 
     Optional<Order> findFirstByUserAndStatusOrderByOrderDateDesc(User user, OrderStatus status);
+
+    List<Order> findByStatusAndOrderDateBefore(OrderStatus status, LocalDateTime cutoff);
 }

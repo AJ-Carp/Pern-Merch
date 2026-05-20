@@ -1,6 +1,7 @@
 package com.ajcarpinello.Pern_Merch_Website.service;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import com.ajcarpinello.Pern_Merch_Website.dto.PaymentIntentResponse;
 import com.ajcarpinello.Pern_Merch_Website.entity.Order;
@@ -13,8 +14,10 @@ import com.stripe.model.Event;
 import com.stripe.model.PaymentIntent;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class PaymentService {
 
@@ -25,17 +28,27 @@ public class PaymentService {
     private final ProcessedStripeEventRepository eventRepository;
 
     public PaymentIntentResponse initiateCheckout(String username) throws StripeException {
-        // Transaction 1 (in OrderService): reserve stock + create or reuse pending order. Short.
-        Order order = orderService.createPendingOrder(username);
+
+        Order order;
+        Optional<Order> existing = orderService.findPendingOrder(username);
+        if (existing.isPresent() && !orderService.pendingOrderCartMatches(existing.get().getId())) {
+            cancelOrderFully(existing.get().getId());   // Stripe PI cancel + stock release
+            order = orderService.createPendingOrder(username);
+        } else if (existing.isPresent()) {
+            // existing matches
+            order = existing.get();
+        } else {
+            order = orderService.createPendingOrder(username);
+        }
 
         // If this is a reused order that already has an intent, verify it is still usable
         if (order.getStripePaymentIntentId() != null) {
-            PaymentIntent existing = stripeService.retrievePaymentIntent(order.getStripePaymentIntentId());
-            if ("canceled".equals(existing.getStatus())) {
+            PaymentIntent existingPaymentIntent = stripeService.retrievePaymentIntent(order.getStripePaymentIntentId());
+            if ("canceled".equals(existingPaymentIntent.getStatus())) {
                 orderService.cancelAndReleaseStock(order.getId());
                 order = orderService.createPendingOrder(username);
             } else {
-                return new PaymentIntentResponse(existing.getClientSecret(), order.getId());
+                return new PaymentIntentResponse(existingPaymentIntent.getClientSecret(), order.getId());
             }
         }
 
@@ -68,7 +81,7 @@ public class PaymentService {
         Order order = orderRepository.findByStripePaymentIntentId(intent.getId())
                 .orElseThrow(() -> new IllegalStateException("Order not found for PI: " + intent.getId()));
 
-        if (order.getStatus() == OrderStatus.PAID) return; // order-level idempotency
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) return; // order-level idempotency
 
         order.setStatus(OrderStatus.PAID);
         order.setPaidAt(LocalDateTime.now());
@@ -77,11 +90,52 @@ public class PaymentService {
         cartService.clearCart(order.getUser().getUsername());
     }
 
-    @Transactional
     public void handlePaymentFailed(Event event) {
         PaymentIntent intent = (PaymentIntent) event.getDataObjectDeserializer().getObject().orElseThrow();
-        Order order = orderRepository.findByStripePaymentIntentId(intent.getId()).orElseThrow();
-        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) return;
-        orderService.cancelAndReleaseStock(order.getId());
+        // A failed attempt is NOT terminal — the PaymentIntent stays alive and the
+        // customer can retry with another card. Do nothing here; the abandoned-order
+        // sweeper / user cancel handles stock release if the order is never paid.
+        log.info("payment_intent.payment_failed for PI {} — retryable, no action taken", intent.getId());
+    }
+
+    /**
+     * Cancels an order end-to-end: the Stripe PaymentIntent first, then the local
+     * stock/DB. Stripe-first so we never release stock for a payment that actually
+     * went through. Shared by the user cancel button and the abandoned-order sweeper.
+     *
+     * Deliberately NOT @Transactional: it makes a Stripe network call, which must
+     * not hold a DB transaction open. The DB write is delegated to
+     * orderService.cancelAndReleaseStock, which has its own short transaction.
+     */
+    public CancelOutcome cancelOrderFully(Long orderId) throws StripeException {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
+
+        // Idempotent: only a still-pending order can be canceled. Covers double
+        // clicks and sweeper-vs-button races.
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) return CancelOutcome.NOOP;
+
+        String intentId = order.getStripePaymentIntentId();
+        if (intentId != null) {
+            PaymentIntent pi = stripeService.cancelPaymentIntent(intentId);
+            // Stripe says it already succeeded — the money went through. Do NOT
+            // release stock; the payment_intent.succeeded webhook will finalize it.
+            if ("succeeded".equals(pi.getStatus())) return CancelOutcome.ALREADY_PAID;
+        }
+
+        orderService.cancelAndReleaseStock(orderId);
+        return CancelOutcome.CANCELLED;
+    }
+
+    public CancelOutcome cancelPendingCheckout(String username) throws StripeException {
+        Optional<Order> pending = orderService.findPendingOrder(username);
+        if (pending.isEmpty()) return CancelOutcome.NOOP;
+        return cancelOrderFully(pending.get().getId());
+    }
+
+    public enum CancelOutcome {
+        CANCELLED,     // order canceled, stock released
+        ALREADY_PAID,  // payment already succeeded — left for the success webhook
+        NOOP           // nothing to do (already canceled/paid/not pending)
     }
 }

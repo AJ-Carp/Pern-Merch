@@ -49,4 +49,11 @@ public class StripeService {
     public PaymentIntent retrievePaymentIntent(String id) throws StripeException {
         return PaymentIntent.retrieve(id);
     }
+
+    public PaymentIntent cancelPaymentIntent(String intentId) throws StripeException {
+        PaymentIntent pi = PaymentIntent.retrieve(intentId);
+        String s = pi.getStatus();
+        if ("succeeded".equals(s) || "canceled".equals(s)) return pi; // terminal — caller inspects status
+        return pi.cancel();
+    }
 }

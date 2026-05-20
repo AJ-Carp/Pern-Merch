@@ -6,6 +6,7 @@ import com.ajcarpinello.Pern_Merch_Website.service.OrderService;
 import com.ajcarpinello.Pern_Merch_Website.service.PaymentService;
 import com.stripe.exception.StripeException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -26,6 +27,15 @@ public class OrderController {
     @PostMapping("/checkout")
     public ResponseEntity<PaymentIntentResponse> checkout(@AuthenticationPrincipal UserDetails user) throws StripeException {
         return ResponseEntity.ok(paymentService.initiateCheckout(user.getUsername()));
+    }
+
+    @PostMapping("/cancel")
+    public ResponseEntity<Void> cancelPendingCheckout(@AuthenticationPrincipal UserDetails user) throws StripeException {
+        PaymentService.CancelOutcome outcome = paymentService.cancelPendingCheckout(user.getUsername());
+        if (outcome == PaymentService.CancelOutcome.ALREADY_PAID) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build(); // payment already completed
+        }
+        return ResponseEntity.ok().build(); // CANCELLED or NOOP — idempotent success
     }
 
     @GetMapping

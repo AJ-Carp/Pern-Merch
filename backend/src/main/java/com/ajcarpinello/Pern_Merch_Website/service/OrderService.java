@@ -42,21 +42,6 @@ public class OrderService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Cart is empty");
         }
 
-        // idempotent — calling it multiple times has the same effect as calling it once.
-        // Idempotency: reuse existing pending order if cart hasn't changed,
-        // otherwise cancel it and create a fresh one.
-        Optional<Order> existing = orderRepository
-                .findFirstByUserAndStatusOrderByOrderDateDesc(user, OrderStatus.PENDING_PAYMENT);
-        if (existing.isPresent() && cartMatchesOrder(user, existing.get())) {
-            return existing.get();
-        }
-
-        // Cart changed since last attempt — cancel the stale pending order
-        // If it already has a Stripe intent, cancel that first in PaymentService.
-        if (existing.isPresent()) {
-            this.cancelAndReleaseStockInternal(existing.get());
-        }
-
         Order order = new Order();
         BigDecimal priceSum = BigDecimal.ZERO;
         for (CartItem cartItem : cartItems) {
@@ -125,6 +110,13 @@ public class OrderService {
         orderRepository.save(order);
     }
 
+    @Transactional(readOnly = true)
+    public boolean pendingOrderCartMatches(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
+        return cartMatchesOrder(order.getUser(), order);
+    }
+
     /** Cart contents (productId + quantity) match the order's items exactly. */
     private boolean cartMatchesOrder(User user, Order order) {
         List<CartItem> cartItems = cartItemRepository.findByUser(user);
@@ -140,6 +132,13 @@ public class OrderService {
             if (cartQty == null || cartQty != oi.getQuantity()) return false;
         }
         return true;
+    }
+
+    /** The caller's current awaiting-payment order, if any. */
+    public Optional<Order> findPendingOrder(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
+        return orderRepository.findFirstByUserAndStatusOrderByOrderDateDesc(user, OrderStatus.PENDING_PAYMENT);
     }
 
     public List<OrderDTO> getOrderHistory(String username) {
