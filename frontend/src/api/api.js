@@ -121,6 +121,23 @@ export async function createPaymentIntent() {
   return handleResponse(res);
 }
 
+export async function cancelPendingCheckout() {
+  const res = await fetch(`${BASE_URL}/orders/cancel`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  if (res.status === 409) {
+    const err = new Error('Payment already completed');
+    err.alreadyPaid = true;
+    throw err;
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
+  return null;
+}
+
 export async function getOrders() {
   const res = await fetch(`${BASE_URL}/orders`, { headers: authHeaders() });
   return handleResponse(res);
