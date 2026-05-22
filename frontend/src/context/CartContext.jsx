@@ -9,32 +9,34 @@ export function CartProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
 
-  const loadCart = useCallback(async () => {
+  // Pass { silent: true } to refresh the cart without flipping the loading
+  // flag — this avoids the whole cart unmounting/flashing after a mutation.
+  const loadCart = useCallback(async ({ silent = false } = {}) => {
     if (!user) { setCartItems([]); return; }
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const items = await fetchCart();
       setCartItems(items);
     } catch {
       setCartItems([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [user]);
 
   async function addToCart(productId, quantity = 1) {
     await apiAddToCart(productId, quantity);
-    await loadCart();
+    await loadCart({ silent: true });
   }
 
   async function updateQuantity(cartItemId, quantity) {
     await apiUpdateCartItem(cartItemId, quantity);
-    await loadCart();
+    await loadCart({ silent: true });
   }
 
   async function removeItem(cartItemId) {
     await apiRemoveCartItem(cartItemId);
-    await loadCart();
+    await loadCart({ silent: true });
   }
 
   function clearLocalCart() {

@@ -53,8 +53,11 @@ export default function ProductDetail() {
           {product.size && product.size !== 'ONE_SIZE' && (
             <p className="product-size">Size: <strong>{product.size}</strong></p>
           )}
+          {/* Stock count display disabled — only show "Out of stock" when applicable.
+              To re-enable showing the exact quantity, restore the commented line below. */}
           <p className="product-stock">
-            {product.stockQuantity > 0 ? `${product.stockQuantity} in stock` : 'Out of stock'}
+            {/* {product.stockQuantity > 0 ? `${product.stockQuantity} in stock` : 'Out of stock'} */}
+            {product.stockQuantity === 0 && 'Out of stock'}
           </p>
           <button
             className="btn btn-primary btn-lg"
