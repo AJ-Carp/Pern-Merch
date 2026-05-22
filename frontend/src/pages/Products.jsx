@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getProducts } from '../api/api';
 import ProductCard from '../components/ProductCard';
 
-const CATEGORIES = ['All', 'T-Shirts', 'Hoodies', 'Vinyl', 'Posters', 'Accessories'];
+const CATEGORIES = ['All', 'T-Shirts', 'Hats'];
 
 export default function Products() {
   const [products, setProducts] = useState([]);

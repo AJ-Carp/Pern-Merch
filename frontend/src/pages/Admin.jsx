@@ -78,10 +78,7 @@ export default function Admin() {
             <input type="number" step="0.01" placeholder="Price" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required />
             <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
               <option>T-Shirts</option>
-              <option>Hoodies</option>
-              <option>Vinyl</option>
-              <option>Posters</option>
-              <option>Accessories</option>
+              <option>Hats</option>
             </select>
             <input placeholder="Size" value={form.size} onChange={e => setForm({ ...form, size: e.target.value })} />
           </div>
