@@ -55,6 +55,21 @@ export default function OrderHistory() {
                   </div>
                 ))}
               </div>
+              {order.shippingAddress && (
+                <div className="order-shipping" style={{ marginTop: 12, fontSize: '0.9em', opacity: 0.85 }}>
+                  <strong>Shipped to:</strong>
+                  <div>{order.shippingAddress.recipientName}</div>
+                  <div>
+                    {order.shippingAddress.line1}
+                    {order.shippingAddress.line2 ? `, ${order.shippingAddress.line2}` : ''}
+                  </div>
+                  <div>
+                    {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}
+                  </div>
+                  <div>{order.shippingAddress.country}</div>
+                  <div>{order.shippingAddress.phone}</div>
+                </div>
+              )}
             </div>
           ))}
         </div>

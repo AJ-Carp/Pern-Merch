@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { AddressElement, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { cancelPendingCheckout } from '../api/api';
 
-export default function CheckoutForm({ clientSecret }) {
+export default function CheckoutForm({ clientSecret, defaultAddress }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -15,10 +15,27 @@ export default function CheckoutForm({ clientSecret }) {
     setSubmitting(true);
     setErrorMsg(null);
 
+    const addressElement = elements.getElement('address');
+    const { complete, value: addressValue } = await addressElement.getValue();
+    console.log('[checkout] addressElement.getValue():', { complete, addressValue });
+    if (!complete) {
+      setErrorMsg('Please complete the shipping address');
+      setSubmitting(false);
+      return;
+    }
+
+    const shippingPayload = {
+      name: addressValue.name,
+      phone: addressValue.phone,
+      address: addressValue.address,
+    };
+    console.log('[checkout] shipping payload sent to Stripe:', shippingPayload);
+
     const { error } = await stripe.confirmPayment({
       elements,
       confirmParams: {
         return_url: `${window.location.origin}/checkout/success`,
+        shipping: shippingPayload,
       },
       redirect: 'if_required',
     });
@@ -54,8 +71,18 @@ export default function CheckoutForm({ clientSecret }) {
     }
   }
 
+  const addressOptions = {
+    mode: 'shipping',
+    fields: { phone: 'always' },
+    validation: { phone: { required: 'always' } },
+    ...(defaultAddress && { defaultValues: defaultAddress }),
+  };
+
   return (
     <form onSubmit={handleSubmit} className="checkout-form">
+      <h3 style={{ marginBottom: 8 }}>Shipping address</h3>
+      <AddressElement options={addressOptions} />
+      <h3 style={{ marginTop: 24, marginBottom: 8 }}>Payment</h3>
       <PaymentElement />
       {errorMsg && <p className="error" style={{ marginTop: 12 }}>{errorMsg}</p>}
       <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>

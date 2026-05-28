@@ -142,3 +142,10 @@ export async function getOrders() {
   const res = await fetch(`${BASE_URL}/orders`, { headers: authHeaders() });
   return handleResponse(res);
 }
+
+// ---- User ----
+
+export async function getDefaultAddress() {
+  const res = await fetch(`${BASE_URL}/users/me/address`, { headers: authHeaders() });
+  return handleResponse(res);
+}

@@ -128,7 +128,7 @@ public class PaymentService {
         // A failed attempt is NOT terminal — the PaymentIntent stays alive and the
         // customer can retry with another card. Do nothing here; the abandoned-order
         // sweeper / user cancel handles stock release if the order is never paid.
-        log.info("payment_intent.payment_failed for PI {} — retryable, no action taken", intent.getId());
+        log.info("{} for PI {} (current status: {}) — no action taken", event.getType(), intent.getId(), intent.getStatus());
     }
 
     /**
