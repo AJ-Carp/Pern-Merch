@@ -31,4 +31,6 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
+    @Embedded
+    private Address defaultShippingAddress;
 }

@@ -45,6 +45,8 @@ public class Order {
 
     private LocalDateTime paidAt;
 
+    @Embedded
+    private Address shippingAddress;
 
     // cascade - if we save a new order, the associated orderItems will also be saved
     // mappedBy references the foreign key in OrderItem. That foreign key references the order it belongs to

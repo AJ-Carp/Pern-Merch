@@ -1,12 +1,15 @@
 package com.ajcarpinello.Pern_Merch_Website.service;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import com.ajcarpinello.Pern_Merch_Website.dto.PaymentIntentResponse;
+import com.ajcarpinello.Pern_Merch_Website.entity.Address;
 import com.ajcarpinello.Pern_Merch_Website.entity.Order;
 import com.ajcarpinello.Pern_Merch_Website.entity.OrderStatus;
 import com.ajcarpinello.Pern_Merch_Website.entity.ProcessedStripeEvent;
+import com.ajcarpinello.Pern_Merch_Website.entity.User;
 import com.ajcarpinello.Pern_Merch_Website.repository.OrderRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.ProcessedStripeEventRepository;
 import com.stripe.exception.StripeException;
@@ -83,11 +86,41 @@ public class PaymentService {
 
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT) return; // order-level idempotency
 
+        // Shipping was attached to the PaymentIntent by the frontend's confirmPayment call
+        // (via the Stripe AddressElement). Snapshot it onto the order, and sync the user's
+        // default if it differs from what they just used.
+        Address shipping = toAddress(intent.getShipping());
+        if (shipping != null) {
+            order.setShippingAddress(shipping);
+            User user = order.getUser();
+            if (!Objects.equals(user.getDefaultShippingAddress(), shipping)) {
+                user.setDefaultShippingAddress(shipping);
+            }
+        } else {
+            log.warn("payment_intent.succeeded for PI {} arrived without shipping — order {} marked PAID with no address",
+                intent.getId(), order.getId());
+        }
+
         order.setStatus(OrderStatus.PAID);
         order.setPaidAt(LocalDateTime.now());
         orderRepository.save(order);
-        
+
         cartService.clearCart(order.getUser().getUsername());
+    }
+
+    private Address toAddress(com.stripe.model.ShippingDetails shipping) {
+        if (shipping == null || shipping.getAddress() == null) return null;
+        com.stripe.model.Address a = shipping.getAddress();
+        return Address.builder()
+                .recipientName(shipping.getName())
+                .line1(a.getLine1())
+                .line2(a.getLine2())
+                .city(a.getCity())
+                .state(a.getState())
+                .postalCode(a.getPostalCode())
+                .country(a.getCountry())
+                .phone(shipping.getPhone())
+                .build();
     }
 
     public void handlePaymentFailed(Event event) {

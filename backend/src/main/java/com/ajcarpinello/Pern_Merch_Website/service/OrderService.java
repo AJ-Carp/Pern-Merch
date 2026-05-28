@@ -29,6 +29,7 @@ public class OrderService {
     private final CartItemRepository cartItemRepository;
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final UserService userService;
 
     // @Transactional ensures that saving the order and clearing the cart happen as an "all-or-nothing" operation.
     // If one step fails (e.g. database error), everything rolls back, preventing inconsistent states.
@@ -167,6 +168,9 @@ public class OrderService {
             orderItemDTOs.add(toOrderItemDTO(orderItem));
         }
         orderDTO.setItems(orderItemDTOs);
+        if (order.getShippingAddress() != null) {
+            orderDTO.setShippingAddress(userService.toAddressDTO(order.getShippingAddress()));
+        }
         return orderDTO;
     }
 
