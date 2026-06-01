@@ -17,25 +17,21 @@ export default function CheckoutForm({ clientSecret, defaultAddress }) {
 
     const addressElement = elements.getElement('address');
     const { complete, value: addressValue } = await addressElement.getValue();
-    console.log('[checkout] addressElement.getValue():', { complete, addressValue });
     if (!complete) {
       setErrorMsg('Please complete the shipping address');
       setSubmitting(false);
       return;
     }
 
-    const shippingPayload = {
-      name: addressValue.name,
-      phone: addressValue.phone,
-      address: addressValue.address,
-    };
-    console.log('[checkout] shipping payload sent to Stripe:', shippingPayload);
-
     const { error } = await stripe.confirmPayment({
       elements,
       confirmParams: {
         return_url: `${window.location.origin}/checkout/success`,
-        shipping: shippingPayload,
+        shipping: {
+          name: addressValue.name,
+          phone: addressValue.phone,
+          address: addressValue.address,
+        },
       },
       redirect: 'if_required',
     });

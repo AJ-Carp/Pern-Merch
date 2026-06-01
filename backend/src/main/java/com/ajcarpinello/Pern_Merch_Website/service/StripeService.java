@@ -9,11 +9,9 @@ import com.stripe.net.RequestOptions;
 import com.stripe.param.PaymentIntentCreateParams;
 import jakarta.annotation.PostConstruct;
 import java.math.BigDecimal;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 
 @Service
-@Slf4j
 public class StripeService {
 
     @Value("${stripe.secret-key}") private String secretKey;
@@ -56,7 +54,6 @@ public class StripeService {
         PaymentIntent pi = PaymentIntent.retrieve(intentId);
         String s = pi.getStatus();
         if ("succeeded".equals(s) || "canceled".equals(s)) return pi; // terminal — caller inspects status
-        log.warn("Cancelling PaymentIntent {} (current status: {}) -- stack trace follows", intentId, s, new Throwable("PI cancel call site"));
         return pi.cancel();
     }
 }

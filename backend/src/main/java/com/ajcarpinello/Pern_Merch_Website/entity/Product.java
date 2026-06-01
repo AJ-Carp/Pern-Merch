@@ -4,8 +4,11 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import java.math.BigDecimal;
+import java.util.List;
 
 @Entity
 @Table(name = "products")
@@ -35,10 +38,11 @@ public class Product {
     @Column(nullable = false)
     private String category; // T-Shirts, Hoodies, Accessories, etc.
 
-    private String size; // S, M, L, XL, ONE_SIZE
-
     private String imageUrl;
 
-    @Column(nullable = false)
-    private int stockQuantity;
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    // skip the variants field when generating toString() and equals()/hashCode()
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<ProductVariant> variants;
 }
