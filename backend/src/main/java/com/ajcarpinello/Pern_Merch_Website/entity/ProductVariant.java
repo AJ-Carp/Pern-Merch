@@ -8,13 +8,15 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "product_variants")
+// cant have more then one variant with the same product and size
+@Table(name = "product_variants", uniqueConstraints = @UniqueConstraint(columnNames = {"product_id","size"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

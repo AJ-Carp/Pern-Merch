@@ -2,17 +2,16 @@ package com.ajcarpinello.Pern_Merch_Website.service;
 
 import com.ajcarpinello.Pern_Merch_Website.dto.CartItemDTO;
 import com.ajcarpinello.Pern_Merch_Website.entity.CartItem;
-import com.ajcarpinello.Pern_Merch_Website.entity.Product;
+import com.ajcarpinello.Pern_Merch_Website.entity.ProductVariant;
 import com.ajcarpinello.Pern_Merch_Website.entity.User;
 import com.ajcarpinello.Pern_Merch_Website.exception.AppException;
 import com.ajcarpinello.Pern_Merch_Website.repository.CartItemRepository;
-import com.ajcarpinello.Pern_Merch_Website.repository.ProductRepository;
+import com.ajcarpinello.Pern_Merch_Website.repository.ProductVariantRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -23,7 +22,7 @@ public class CartService {
 
     private final UserRepository userRepository;
     private final CartItemRepository cartItemRepository;
-    private final ProductRepository productRepository;
+    private final ProductVariantRepository variantRepository;
 
     public List<CartItemDTO> getCart(String username) {
         User user = findUser(username);
@@ -35,25 +34,25 @@ public class CartService {
         return cartItemDTOS;
     }
 
-    public CartItemDTO addToCart(String username, Long productId, int quantity) {
-        Product product = productRepository.findById(productId).orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Product not found"));
-        if (product.getStockQuantity() < quantity) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Not enough items in stock for: " + product.getName());
+    public CartItemDTO addToCart(String username, Long variantId, int quantity) {
+        ProductVariant variant = variantRepository.findById(variantId).orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "variant not found"));
+        if (variant.getStockQuantity() < quantity) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Not enough items in stock for: " + variant.getSize() + " " + variant.getProduct().getName());
         }
         User user = findUser(username);
 
-        Optional<CartItem> cartItemOptional = cartItemRepository.findByUserAndProductId(user, productId);
+        Optional<CartItem> cartItemOptional = cartItemRepository.findByUserAndVariantId(user, variantId);
         CartItem cartItem;
         if (cartItemOptional.isPresent()) {
             cartItem = cartItemOptional.get();
-            if (product.getStockQuantity() < cartItem.getQuantity() + quantity) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "Not enough items in stock for: " + product.getName());
+            if (variant.getStockQuantity() < cartItem.getQuantity() + quantity) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Not enough items in stock for: " + variant.getSize() + " " + variant.getProduct().getName());
             }
             cartItem.setQuantity(cartItem.getQuantity() + quantity);
         } else {
             cartItem = CartItem.builder()
                     .user(user)
-                    .product(product)
+                    .variant(variant)
                     .quantity(quantity).build();
         }
         cartItemRepository.save(cartItem);
@@ -68,8 +67,9 @@ public class CartService {
             throw new AppException(HttpStatus.FORBIDDEN, "Access denied");
         }
 
-        if (cartItem.getProduct().getStockQuantity() < quantity) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Not enough items in stock for: " + cartItem.getProduct().getName());
+        if (cartItem.getVariant().getStockQuantity() < quantity) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Not enough items in stock for: " + 
+                cartItem.getVariant().getSize() + " " + cartItem.getVariant().getProduct().getName());
         }
 
         if (quantity <= 0) {
@@ -110,13 +110,13 @@ public class CartService {
     private CartItemDTO toDTO(CartItem cartItem) {
         return CartItemDTO.builder()
                 .id(cartItem.getId())
-                .productId(cartItem.getProduct().getId())
-                .productName(cartItem.getProduct().getName())
-                .productImageUrl(cartItem.getProduct().getImageUrl())
-                .productPrice(cartItem.getProduct().getPrice())
-                .size(cartItem.getProduct().getSize())
+                .productId(cartItem.getVariant().getProduct().getId())
+                .productName(cartItem.getVariant().getProduct().getName())
+                .productImageUrl(cartItem.getVariant().getProduct().getImageUrl())
+                .productPrice(cartItem.getVariant().getProduct().getPrice())
+                .size(cartItem.getVariant().getSize())
                 .quantity(cartItem.getQuantity())
-                .stockQuantity(cartItem.getProduct().getStockQuantity())
+                .stockQuantity(cartItem.getVariant().getStockQuantity())
                 .build();
     }
 }

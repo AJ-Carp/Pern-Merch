@@ -1,0 +1,14 @@
+{
+  "folders": [
+    { "path": "." },
+    { "path": "backend" }
+  ],
+  "settings": {
+    "java.project.sourcePaths": ["backend/src/main/java"],
+    "java.import.exclusions": [
+      "**/node_modules/**",
+      "**/frontend/**"
+    ],
+    "java.compile.nullAnalysis.mode": "automatic"
+  }
+}

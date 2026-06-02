@@ -29,7 +29,7 @@ public class CartController {
     public ResponseEntity<CartItemDTO> addToCart(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody AddToCartRequest request) {
-        return ResponseEntity.ok(cartService.addToCart(userDetails.getUsername(), request.getProductId(), request.getQuantity()));
+        return ResponseEntity.ok(cartService.addToCart(userDetails.getUsername(), request.getProductVariantId(), request.getQuantity()));
     }
 
     @PutMapping("/{cartItemId}")

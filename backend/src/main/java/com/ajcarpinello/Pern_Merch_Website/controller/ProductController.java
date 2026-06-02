@@ -1,6 +1,7 @@
 package com.ajcarpinello.Pern_Merch_Website.controller;
 
 import com.ajcarpinello.Pern_Merch_Website.dto.ProductDTO;
+import com.ajcarpinello.Pern_Merch_Website.dto.ProductVariantDTO;
 import com.ajcarpinello.Pern_Merch_Website.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +24,7 @@ public class ProductController {
         return ResponseEntity.ok(productService.getAllProducts());
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{productId}")
     public ResponseEntity<ProductDTO> getProduct(@PathVariable Long id) {
         return ResponseEntity.ok(productService.getProduct(id));
     }
@@ -33,15 +34,30 @@ public class ProductController {
         return ResponseEntity.ok(productService.createProduct(dto));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/{productId}")
     public ResponseEntity<ProductDTO> updateProduct(@PathVariable Long id, @RequestBody ProductDTO dto) {
         return ResponseEntity.ok(productService.updateProduct(id, dto));
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{productId}")
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/variants/{productId}")
+    public ResponseEntity<ProductVariantDTO> addVariant(@PathVariable Long id, @RequestBody ProductVariantDTO dto) {
+        return ResponseEntity.ok(productService.addVariant(id, dto));
+    }
+
+    @PutMapping("/variants/{variantId}")
+    public ResponseEntity<ProductVariantDTO> updateVariant(@PathVariable Long id, @RequestBody ProductVariantDTO dto) {
+        return ResponseEntity.ok(productService.updateVariant(id, dto));
+    }
+
+    @DeleteMapping("/variants/{variantId}")
+    public ResponseEntity<Void> deleteVariant(@PathVariable Long variantId) {
+        productService.deleteVariant(variantId);
+        return ResponseEntity.noContent().build();
+    }
 }

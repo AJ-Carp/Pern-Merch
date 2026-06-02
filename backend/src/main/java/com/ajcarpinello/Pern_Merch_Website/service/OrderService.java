@@ -6,7 +6,7 @@ import com.ajcarpinello.Pern_Merch_Website.entity.*;
 import com.ajcarpinello.Pern_Merch_Website.exception.AppException;
 import com.ajcarpinello.Pern_Merch_Website.repository.CartItemRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.OrderRepository;
-import com.ajcarpinello.Pern_Merch_Website.repository.ProductRepository;
+import com.ajcarpinello.Pern_Merch_Website.repository.ProductVariantRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-
 @Service
 @RequiredArgsConstructor
 public class OrderService {
@@ -28,7 +27,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final CartItemRepository cartItemRepository;
     private final OrderRepository orderRepository;
-    private final ProductRepository productRepository;
+    private final ProductVariantRepository variantRepository;
     private final UserService userService;
 
     // @Transactional ensures that saving the order and clearing the cart happen as an "all-or-nothing" operation.
@@ -49,13 +48,14 @@ public class OrderService {
             /* Re-fetch the product with a pessimistic lock so no other transaction
                can modify its stock until this checkout transaction completes. */
             // prevents a race condition where both users purchase an item when there's only one left
-            Product product = productRepository.findByIdForUpdate(cartItem.getProduct().getId())
-                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Product no longer exists"));
+            ProductVariant variant = variantRepository.findByIdForUpdate(cartItem.getVariant().getId())
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Variant no longer exists"));
+            Product product = variant.getProduct();
 
-            if (cartItem.getQuantity() > product.getStockQuantity()) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "Not enough stock for: " + product.getName());
+            if (cartItem.getQuantity() > variant.getStockQuantity()) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Not enough stock for: " + variant.getSize() + " " + product.getName());
             }
-            product.setStockQuantity(product.getStockQuantity() - cartItem.getQuantity());
+            variant.setStockQuantity(variant.getStockQuantity() - cartItem.getQuantity());
 
             /* If we fetch an existing entity inside a @Transactional method and
                modify any of its fields, JPA automatically issues an UPDATE when the transaction commits (method ends). */
@@ -63,7 +63,7 @@ public class OrderService {
 
             OrderItem orderItem = OrderItem.builder()
                     .order(order)
-                    .product(product)
+                    .variant(variant)
                     .quantity(cartItem.getQuantity())
                     .priceAtPurchase(product.getPrice()).build();
             order.getItems().add(orderItem);
@@ -103,9 +103,9 @@ public class OrderService {
     private void cancelAndReleaseStockInternal(Order order) {
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT) return; // already handled
         for (OrderItem item : order.getItems()) {
-            Product product = productRepository.findByIdForUpdate(item.getProduct().getId())
+            ProductVariant variant = variantRepository.findByIdForUpdate(item.getVariant().getId())
                     .orElseThrow();
-            product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
+            variant.setStockQuantity(variant.getStockQuantity() + item.getQuantity());
         }
         order.setStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
@@ -125,11 +125,11 @@ public class OrderService {
 
         Map<Long, Integer> cartMap = new HashMap<>();
         for (CartItem ci : cartItems) {
-            cartMap.put(ci.getProduct().getId(), ci.getQuantity());
+            cartMap.put(ci.getVariant().getId(), ci.getQuantity());
         }
 
         for (OrderItem oi : order.getItems()) {
-            Integer cartQty = cartMap.get(oi.getProduct().getId());
+            Integer cartQty = cartMap.get(oi.getVariant().getId());
             if (cartQty == null || cartQty != oi.getQuantity()) return false;
         }
         return true;
@@ -176,8 +176,9 @@ public class OrderService {
 
     private OrderItemDTO toOrderItemDTO(OrderItem orderItem) {
         return OrderItemDTO.builder()
-                .productId(orderItem.getProduct().getId())
-                .productName(orderItem.getProduct().getName())
+                .productId(orderItem.getVariant().getProduct().getId())
+                .productName(orderItem.getVariant().getProduct().getName())
+                .size(orderItem.getVariant().getSize())
                 .quantity(orderItem.getQuantity())
                 .priceAtPurchase(orderItem.getPriceAtPurchase()).build();
     }
