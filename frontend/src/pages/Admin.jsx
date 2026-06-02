@@ -1,12 +1,23 @@
 import { useEffect, useState } from 'react';
-import { getProducts, createProduct, updateProduct, deleteProduct } from '../api/api';
+import {
+  getProducts, createProduct, updateProduct, deleteProduct,
+  addVariant, updateVariant, deleteVariant,
+} from '../api/api';
+import { VARIANT_SIZES } from '../utils/size';
+
+const EMPTY_PRODUCT = { name: '', description: '', price: '', category: 'T-Shirts', imageUrl: '' };
 
 export default function Admin() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: '', description: '', price: '', category: 'T-Shirts', size: 'M', imageUrl: '', stockQuantity: '' });
+  const [form, setForm] = useState(EMPTY_PRODUCT);
   const [error, setError] = useState('');
+
+  // Variant management for one selected product.
+  const [variantProductId, setVariantProductId] = useState(null);
+  const [newVariant, setNewVariant] = useState({ size: 'M', stockQuantity: '' });
+  const [variantError, setVariantError] = useState('');
 
   useEffect(() => { loadProducts(); }, []);
 
@@ -16,8 +27,11 @@ export default function Admin() {
     setLoading(false);
   }
 
+  // Re-derived from products each render so it stays fresh after a reload.
+  const variantProduct = products.find(p => p.id === variantProductId) || null;
+
   function resetForm() {
-    setForm({ name: '', description: '', price: '', category: 'T-Shirts', size: 'M', imageUrl: '', stockQuantity: '' });
+    setForm(EMPTY_PRODUCT);
     setEditing(null);
     setError('');
   }
@@ -29,17 +43,14 @@ export default function Admin() {
       description: product.description || '',
       price: product.price,
       category: product.category,
-      size: product.size || '',
       imageUrl: product.imageUrl || '',
-      stockQuantity: product.stockQuantity,
     });
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
-    const payload = { ...form, price: parseFloat(form.price), stockQuantity: parseInt(form.stockQuantity) };
-
+    const payload = { ...form, price: parseFloat(form.price) };
     try {
       if (editing) {
         await updateProduct(editing, payload);
@@ -57,9 +68,48 @@ export default function Admin() {
     if (!confirm('Delete this product?')) return;
     try {
       await deleteProduct(id);
+      if (variantProductId === id) setVariantProductId(null);
       loadProducts();
     } catch (err) {
       alert(err.message);
+    }
+  }
+
+  function toggleVariants(productId) {
+    setVariantError('');
+    setNewVariant({ size: 'M', stockQuantity: '' });
+    setVariantProductId(prev => (prev === productId ? null : productId));
+  }
+
+  async function handleAddVariant(e) {
+    e.preventDefault();
+    setVariantError('');
+    try {
+      await addVariant(variantProductId, { size: newVariant.size, stockQuantity: parseInt(newVariant.stockQuantity) });
+      setNewVariant({ size: 'M', stockQuantity: '' });
+      await loadProducts();
+    } catch (err) {
+      setVariantError(err.message);
+    }
+  }
+
+  async function handleSaveVariant(variant, stockQuantity) {
+    setVariantError('');
+    try {
+      await updateVariant(variant.id, { size: variant.size, stockQuantity: parseInt(stockQuantity) });
+      await loadProducts();
+    } catch (err) {
+      setVariantError(err.message);
+    }
+  }
+
+  async function handleDeleteVariant(variantId) {
+    setVariantError('');
+    try {
+      await deleteVariant(variantId);
+      await loadProducts();
+    } catch (err) {
+      setVariantError(err.message);
     }
   }
 
@@ -80,15 +130,16 @@ export default function Admin() {
               <option>T-Shirts</option>
               <option>Hats</option>
             </select>
-            <input placeholder="Size" value={form.size} onChange={e => setForm({ ...form, size: e.target.value })} />
           </div>
           <input placeholder="Image URL" value={form.imageUrl} onChange={e => setForm({ ...form, imageUrl: e.target.value })} />
-          <input type="number" placeholder="Stock Quantity" value={form.stockQuantity} onChange={e => setForm({ ...form, stockQuantity: e.target.value })} required />
           <div className="admin-form-actions">
             <button className="btn btn-primary" type="submit">{editing ? 'Update' : 'Add Product'}</button>
             {editing && <button className="btn btn-outline" type="button" onClick={resetForm}>Cancel</button>}
           </div>
         </form>
+        <p className="admin-hint" style={{ opacity: 0.7, fontSize: '0.85em', marginTop: 8 }}>
+          Sizes &amp; stock are managed per product via the <strong>Variants</strong> button below.
+        </p>
       </div>
 
       {/* Product Table */}
@@ -101,7 +152,7 @@ export default function Admin() {
                 <th>Name</th>
                 <th>Category</th>
                 <th>Price</th>
-                <th>Stock</th>
+                <th>Sizes</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -112,9 +163,12 @@ export default function Admin() {
                   <td>{p.name}</td>
                   <td>{p.category}</td>
                   <td>${p.price?.toFixed(2)}</td>
-                  <td>{p.stockQuantity}</td>
+                  <td>{p.variants?.length ? p.variants.map(v => v.size).join(', ') : '—'}</td>
                   <td>
                     <button className="btn btn-sm btn-outline" onClick={() => startEdit(p)}>Edit</button>
+                    <button className="btn btn-sm btn-outline" onClick={() => toggleVariants(p.id)}>
+                      {variantProductId === p.id ? 'Hide' : 'Variants'}
+                    </button>
                     <button className="btn btn-sm btn-danger" onClick={() => handleDelete(p.id)}>Delete</button>
                   </td>
                 </tr>
@@ -123,6 +177,71 @@ export default function Admin() {
           </table>
         </div>
       )}
+
+      {/* Variant management panel */}
+      {variantProduct && (
+        <div className="admin-form-card" style={{ marginTop: '1.5rem' }}>
+          <h3>Variants — {variantProduct.name}</h3>
+          {variantError && <p className="error-msg">{variantError}</p>}
+
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Size</th>
+                <th>Stock</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(variantProduct.variants || []).map(v => (
+                <VariantRow
+                  key={v.id}
+                  variant={v}
+                  onSave={stock => handleSaveVariant(v, stock)}
+                  onDelete={() => handleDeleteVariant(v.id)}
+                />
+              ))}
+              {(variantProduct.variants || []).length === 0 && (
+                <tr><td colSpan={3} style={{ opacity: 0.7 }}>No variants yet — add a size below.</td></tr>
+              )}
+            </tbody>
+          </table>
+
+          <form className="admin-form-row" onSubmit={handleAddVariant} style={{ marginTop: '1rem' }}>
+            <select value={newVariant.size} onChange={e => setNewVariant({ ...newVariant, size: e.target.value })}>
+              {VARIANT_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <input
+              type="number"
+              min="0"
+              placeholder="Stock"
+              value={newVariant.stockQuantity}
+              onChange={e => setNewVariant({ ...newVariant, stockQuantity: e.target.value })}
+              required
+            />
+            <button className="btn btn-primary" type="submit">Add Variant</button>
+          </form>
+        </div>
+      )}
     </div>
+  );
+}
+
+// One editable variant row: stock is locally editable and saved on demand.
+function VariantRow({ variant, onSave, onDelete }) {
+  const [stock, setStock] = useState(variant.stockQuantity);
+  const dirty = String(stock) !== String(variant.stockQuantity);
+
+  return (
+    <tr>
+      <td>{variant.size}</td>
+      <td>
+        <input type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} style={{ width: 90 }} />
+      </td>
+      <td>
+        <button className="btn btn-sm btn-primary" type="button" disabled={!dirty} onClick={() => onSave(stock)}>Save</button>
+        <button className="btn btn-sm btn-danger" type="button" onClick={onDelete}>Remove</button>
+      </td>
+    </tr>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { isOneSize } from '../utils/size';
 
 export default function Cart() {
   const { cartItems, cartCount, loading, loadCart, updateQuantity, removeItem } = useCart();
@@ -43,7 +44,7 @@ export default function Cart() {
                 <img src={item.productImageUrl || 'https://via.placeholder.com/80x80/1a1a2e/e94560?text=P'} alt={item.productName} className="cart-item-img" />
                 <div className="cart-item-info">
                   <h3>{item.productName}</h3>
-                  {item.size && item.size !== 'ONE_SIZE' && <span className="cart-item-size">Size: {item.size}</span>}
+                  {!isOneSize(item.size) && <span className="cart-item-size">Size: {item.size}</span>}
                   <span className="cart-item-price">${item.productPrice?.toFixed(2)}</span>
                 </div>
                 <div className="cart-item-actions">

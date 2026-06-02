@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getOrders } from '../api/api';
+import { isOneSize } from '../utils/size';
 
 const STATUS_LABELS = {
   PAID: 'Paid',
@@ -49,7 +50,7 @@ export default function OrderHistory() {
               <div className="order-items">
                 {order.items.map((item, i) => (
                   <div key={i} className="order-item">
-                    <span>{item.productName}</span>
+                    <span>{item.productName}{!isOneSize(item.size) ? ` — ${item.size}` : ''}</span>
                     <span>x{item.quantity}</span>
                     <span>${item.priceAtPurchase?.toFixed(2)}</span>
                   </div>

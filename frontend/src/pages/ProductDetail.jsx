@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getProduct } from '../api/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { isOneSize } from '../utils/size';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -12,28 +13,47 @@ export default function ProductDetail() {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [selectedVariantId, setSelectedVariantId] = useState(null);
 
   useEffect(() => {
     getProduct(id)
-      .then(setProduct)
+      .then(p => {
+        setProduct(p);
+        // Auto-select when there's only one variant (e.g. a one-size item).
+        if (p?.variants?.length === 1) setSelectedVariantId(p.variants[0].id);
+      })
       .catch(() => setProduct(null))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const variants = product?.variants || [];
+  const selectedVariant = variants.find(v => v.id === selectedVariantId) || null;
+  // Hide the size selector for single one-size variants ("Adjustable").
+  const oneSize = variants.length === 1 && isOneSize(variants[0].size);
 
   async function handleAddToCart() {
     if (!user) {
       navigate('/login');
       return;
     }
+    if (!selectedVariant) return;
     setAdding(true);
     try {
-      await addToCart(product.id);
+      await addToCart(selectedVariant.id);
       alert('Added to cart!');
     } catch (err) {
       alert(err.message);
     } finally {
       setAdding(false);
     }
+  }
+
+  function addToCartLabel() {
+    if (adding) return 'Adding...';
+    if (variants.length === 0) return 'Out of Stock';
+    if (!selectedVariant) return 'Select a Size';
+    if (selectedVariant.stockQuantity === 0) return 'Out of Stock';
+    return 'Add to Cart';
   }
 
   if (loading) return <p className="loading-text">Loading...</p>;
@@ -50,21 +70,34 @@ export default function ProductDetail() {
           <h1>{product.name}</h1>
           <p className="product-price-large">${product.price?.toFixed(2)}</p>
           <p className="product-description">{product.description}</p>
-          {product.size && product.size !== 'ONE_SIZE' && (
-            <p className="product-size">Size: <strong>{product.size}</strong></p>
+
+          {variants.length === 0 ? (
+            <p className="product-stock">Out of stock</p>
+          ) : oneSize ? null : (
+            <div className="size-selector">
+              <p className="size-selector-label">Size:</p>
+              <div className="size-options">
+                {variants.map(v => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    className={`size-option ${selectedVariantId === v.id ? 'active' : ''}`}
+                    disabled={v.stockQuantity === 0}
+                    onClick={() => setSelectedVariantId(v.id)}
+                  >
+                    {v.size}{v.stockQuantity === 0 ? ' (Sold out)' : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
-          {/* Stock count display disabled — only show "Out of stock" when applicable.
-              To re-enable showing the exact quantity, restore the commented line below. */}
-          <p className="product-stock">
-            {/* {product.stockQuantity > 0 ? `${product.stockQuantity} in stock` : 'Out of stock'} */}
-            {product.stockQuantity === 0 && 'Out of stock'}
-          </p>
+
           <button
             className="btn btn-primary btn-lg"
             onClick={handleAddToCart}
-            disabled={adding || product.stockQuantity === 0}
+            disabled={adding || !selectedVariant || selectedVariant.stockQuantity === 0}
           >
-            {adding ? 'Adding...' : 'Add to Cart'}
+            {addToCartLabel()}
           </button>
           <button className="btn btn-outline" style={{ marginLeft: '1rem' }} onClick={() => navigate('/products')}>
             Back to Shop

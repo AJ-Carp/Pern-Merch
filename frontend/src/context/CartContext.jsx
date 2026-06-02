@@ -24,8 +24,8 @@ export function CartProvider({ children }) {
     }
   }, [user]);
 
-  async function addToCart(productId, quantity = 1) {
-    await apiAddToCart(productId, quantity);
+  async function addToCart(productVariantId, quantity = 1) {
+    await apiAddToCart(productVariantId, quantity);
     await loadCart({ silent: true });
   }
 

@@ -25,8 +25,8 @@ public class ProductController {
     }
 
     @GetMapping("/{productId}")
-    public ResponseEntity<ProductDTO> getProduct(@PathVariable Long id) {
-        return ResponseEntity.ok(productService.getProduct(id));
+    public ResponseEntity<ProductDTO> getProduct(@PathVariable Long productId) {
+        return ResponseEntity.ok(productService.getProduct(productId));
     }
 
     @PostMapping
@@ -35,24 +35,24 @@ public class ProductController {
     }
 
     @PutMapping("/{productId}")
-    public ResponseEntity<ProductDTO> updateProduct(@PathVariable Long id, @RequestBody ProductDTO dto) {
-        return ResponseEntity.ok(productService.updateProduct(id, dto));
+    public ResponseEntity<ProductDTO> updateProduct(@PathVariable Long productId, @RequestBody ProductDTO dto) {
+        return ResponseEntity.ok(productService.updateProduct(productId, dto));
     }
 
     @DeleteMapping("/{productId}")
-    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
-        productService.deleteProduct(id);
+    public ResponseEntity<Void> deleteProduct(@PathVariable Long productId) {
+        productService.deleteProduct(productId);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/variants/{productId}")
-    public ResponseEntity<ProductVariantDTO> addVariant(@PathVariable Long id, @RequestBody ProductVariantDTO dto) {
-        return ResponseEntity.ok(productService.addVariant(id, dto));
+    public ResponseEntity<ProductVariantDTO> addVariant(@PathVariable Long productId, @RequestBody ProductVariantDTO dto) {
+        return ResponseEntity.ok(productService.addVariant(productId, dto));
     }
 
     @PutMapping("/variants/{variantId}")
-    public ResponseEntity<ProductVariantDTO> updateVariant(@PathVariable Long id, @RequestBody ProductVariantDTO dto) {
-        return ResponseEntity.ok(productService.updateVariant(id, dto));
+    public ResponseEntity<ProductVariantDTO> updateVariant(@PathVariable Long variantId, @RequestBody ProductVariantDTO dto) {
+        return ResponseEntity.ok(productService.updateVariant(variantId, dto));
     }
 
     @DeleteMapping("/variants/{variantId}")

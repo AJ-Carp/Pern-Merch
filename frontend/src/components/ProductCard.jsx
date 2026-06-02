@@ -1,6 +1,10 @@
 import { Link } from 'react-router-dom';
 
 export default function ProductCard({ product }) {
+  const variants = product.variants || [];
+  // Out of stock only when the product has variants and none of them have stock.
+  const outOfStock = variants.length > 0 && variants.every(v => v.stockQuantity === 0);
+
   return (
     <Link to={`/products/${product.id}`} className="product-card">
       <div className="product-card-img">
@@ -10,7 +14,7 @@ export default function ProductCard({ product }) {
         <span className="product-card-category">{product.category}</span>
         <h3>{product.name}</h3>
         <p className="product-card-price">${product.price?.toFixed(2)}</p>
-        {product.stockQuantity === 0 && <span className="out-of-stock-badge">Out of Stock</span>}
+        {outOfStock && <span className="out-of-stock-badge">Out of Stock</span>}
       </div>
     </Link>
   );

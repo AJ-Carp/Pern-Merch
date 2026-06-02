@@ -78,6 +78,34 @@ export async function deleteProduct(id) {
   return handleResponse(res);
 }
 
+// ---- Variants (admin) ----
+
+export async function addVariant(productId, variant) {
+  const res = await fetch(`${BASE_URL}/products/variants/${productId}`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(variant),
+  });
+  return handleResponse(res);
+}
+
+export async function updateVariant(variantId, variant) {
+  const res = await fetch(`${BASE_URL}/products/variants/${variantId}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(variant),
+  });
+  return handleResponse(res);
+}
+
+export async function deleteVariant(variantId) {
+  const res = await fetch(`${BASE_URL}/products/variants/${variantId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
 // ---- Cart ----
 
 export async function getCart() {
@@ -85,11 +113,11 @@ export async function getCart() {
   return handleResponse(res);
 }
 
-export async function addToCart(productId, quantity = 1) {
+export async function addToCart(productVariantId, quantity = 1) {
   const res = await fetch(`${BASE_URL}/cart`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ productId, quantity }),
+    body: JSON.stringify({ productVariantId, quantity }),
   });
   return handleResponse(res);
 }
