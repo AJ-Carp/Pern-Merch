@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import java.math.BigDecimal;
 import java.util.List;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "products")
@@ -39,6 +40,16 @@ public class Product {
     private String category; // T-Shirts, Hoodies, Accessories, etc.
 
     private String imageUrl;
+
+    /* Soft-delete flag. "Deleting" a product sets this to false instead of removing the
+    row, so its variants stay valid FK targets for past order_items (no history corruption).
+    Storefront reads filter to active=true; archived products disappear from the shop. */
+    @Column(nullable = false)
+    // sets column to true by default in DB
+    @ColumnDefault("true")
+    // building a product (using builder) will set active to true by default
+    @Builder.Default
+    private boolean active = true;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     // skip the variants field when generating toString() and equals()/hashCode()

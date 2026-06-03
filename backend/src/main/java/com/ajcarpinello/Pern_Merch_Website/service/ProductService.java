@@ -12,6 +12,7 @@ import com.ajcarpinello.Pern_Merch_Website.repository.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,7 +26,7 @@ public class ProductService {
     private final CartItemRepository cartItemRepository;
 
     public List<ProductDTO> getAllProducts() {
-        List<Product> products = productRepository.findAll();
+        List<Product> products = productRepository.findByActiveTrue();
         return toProductDTOList(products);
     }
 
@@ -35,12 +36,12 @@ public class ProductService {
     }
 
     public List<ProductDTO> getProductsByCategory(String category) {
-        List<Product> products = productRepository.findByCategory(category);
+        List<Product> products = productRepository.findByCategoryAndActiveTrue(category);
         return toProductDTOList(products);
     }
 
     public ProductDTO getProduct(Long id) {
-        Product product = productRepository.findById(id).orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Product not found"));
+        Product product = productRepository.findByIdAndActiveTrue(id).orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Product not found"));
         return toProductDTO(product);
     }
 
@@ -69,8 +70,12 @@ public class ProductService {
         return toProductDTO(productRepository.save(product));
     }
 
+    @Transactional
     public void deleteProduct(Long id) {
-        productRepository.deleteById(id);
+        Product product = productRepository.findById(id).orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Product not found"));
+        cartItemRepository.deleteByVariantProductId(id);
+        product.setActive(false);
+        productRepository.save(product);
     }
 
     public ProductVariantDTO addVariant(Long productId, ProductVariantDTO variantDTO) {

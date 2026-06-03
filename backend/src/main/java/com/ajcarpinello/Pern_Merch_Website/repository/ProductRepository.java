@@ -10,7 +10,14 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
+
     List<Product> findByCategory(String category);
+
+    List<Product> findByActiveTrue();
+
+    List<Product> findByCategoryAndActiveTrue(String category);
+
+    Optional<Product> findByIdAndActiveTrue(Long id);
 
     // Locks the product row in the database for the duration of the current transaction.
     // This prevents two concurrent checkouts from both reading the same stock count,
