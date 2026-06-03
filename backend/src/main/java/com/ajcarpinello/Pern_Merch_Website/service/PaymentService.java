@@ -12,8 +12,11 @@ import com.ajcarpinello.Pern_Merch_Website.entity.ProcessedStripeEvent;
 import com.ajcarpinello.Pern_Merch_Website.entity.User;
 import com.ajcarpinello.Pern_Merch_Website.repository.OrderRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.ProcessedStripeEventRepository;
+import com.stripe.Stripe;
+import com.stripe.exception.EventDataObjectDeserializationException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Event;
+import com.stripe.model.EventDataObjectDeserializer;
 import com.stripe.model.PaymentIntent;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -80,7 +83,7 @@ public class PaymentService {
 
     @Transactional
     public void handlePaymentSucceeded(Event event) {
-        PaymentIntent intent = (PaymentIntent) event.getDataObjectDeserializer().getObject().orElseThrow();
+        PaymentIntent intent = extractIntent(event);
         Order order = orderRepository.findByStripePaymentIntentId(intent.getId())
                 .orElseThrow(() -> new IllegalStateException("Order not found for PI: " + intent.getId()));
 
@@ -124,11 +127,30 @@ public class PaymentService {
     }
 
     public void handlePaymentFailed(Event event) {
-        PaymentIntent intent = (PaymentIntent) event.getDataObjectDeserializer().getObject().orElseThrow();
+        PaymentIntent intent = extractIntent(event);
         // A failed attempt is NOT terminal — the PaymentIntent stays alive and the
         // customer can retry with another card. Do nothing here; the abandoned-order
         // sweeper / user cancel handles stock release if the order is never paid.
         log.info("{} for PI {} (current status: {}) — no action taken", event.getType(), intent.getId(), intent.getStatus());
+    }
+
+    // two version of stripe: API (sending webhook) and our projects version in POM
+    // we first try to deserializer the event the safe way (ensures versions match)
+    // if it fails, we deserializer using unsafe way and log a warning (events json may not be what we expect)
+    private PaymentIntent extractIntent(Event event) {
+        EventDataObjectDeserializer deserializer = event.getDataObjectDeserializer();
+        if (deserializer.getObject().isPresent()) {
+            return (PaymentIntent)deserializer.getObject().get();
+        }
+        // Safe deserialize failed → account/endpoint API version differs from stripe-java's
+        // (2026-03-25.dahlia). Force it; the fields we use (id, status, shipping) are stable.
+        log.warn("Event {} arrived on API version {} (lib expects {}); using deserializeUnsafe()",
+                event.getId(), event.getApiVersion(), Stripe.API_VERSION);
+        try {
+            return (PaymentIntent) deserializer.deserializeUnsafe();
+        } catch (EventDataObjectDeserializationException e) {
+            throw new IllegalStateException("Cannot deserialize event " + event.getId(), e);
+        }
     }
 
     /**
