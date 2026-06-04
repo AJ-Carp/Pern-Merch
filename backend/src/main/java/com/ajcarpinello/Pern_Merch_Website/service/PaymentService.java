@@ -1,15 +1,12 @@
 package com.ajcarpinello.Pern_Merch_Website.service;
 
 import java.time.LocalDateTime;
-import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import com.ajcarpinello.Pern_Merch_Website.dto.PaymentIntentResponse;
-import com.ajcarpinello.Pern_Merch_Website.entity.Address;
 import com.ajcarpinello.Pern_Merch_Website.entity.Order;
 import com.ajcarpinello.Pern_Merch_Website.entity.OrderStatus;
 import com.ajcarpinello.Pern_Merch_Website.entity.ProcessedStripeEvent;
-import com.ajcarpinello.Pern_Merch_Website.entity.User;
 import com.ajcarpinello.Pern_Merch_Website.repository.OrderRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.ProcessedStripeEventRepository;
 import com.stripe.Stripe;
@@ -18,7 +15,6 @@ import com.stripe.exception.StripeException;
 import com.stripe.model.Event;
 import com.stripe.model.EventDataObjectDeserializer;
 import com.stripe.model.PaymentIntent;
-import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,7 +25,6 @@ public class PaymentService {
 
     private final OrderService orderService;
     private final OrderRepository orderRepository;
-    private final CartService cartService;
     private final StripeService stripeService;
     private final ProcessedStripeEventRepository eventRepository;
 
@@ -81,49 +76,9 @@ public class PaymentService {
             .eventId(eventId).eventType(eventType).processedAt(LocalDateTime.now()).build());
     }
 
-    @Transactional
     public void handlePaymentSucceeded(Event event) {
         PaymentIntent intent = extractIntent(event);
-        Order order = orderRepository.findByStripePaymentIntentId(intent.getId())
-                .orElseThrow(() -> new IllegalStateException("Order not found for PI: " + intent.getId()));
-
-        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) return; // order-level idempotency
-
-        // Shipping was attached to the PaymentIntent by the frontend's confirmPayment call
-        // (via the Stripe AddressElement). Snapshot it onto the order, and sync the user's
-        // default if it differs from what they just used.
-        Address shipping = toAddress(intent.getShipping());
-        if (shipping != null) {
-            order.setShippingAddress(shipping);
-            User user = order.getUser();
-            if (!Objects.equals(user.getDefaultShippingAddress(), shipping)) {
-                user.setDefaultShippingAddress(shipping);
-            }
-        } else {
-            log.warn("payment_intent.succeeded for PI {} arrived without shipping — order {} marked PAID with no address",
-                intent.getId(), order.getId());
-        }
-
-        order.setStatus(OrderStatus.PAID);
-        order.setPaidAt(LocalDateTime.now());
-        orderRepository.save(order);
-
-        cartService.clearCart(order.getUser().getUsername());
-    }
-
-    private Address toAddress(com.stripe.model.ShippingDetails shipping) {
-        if (shipping == null || shipping.getAddress() == null) return null;
-        com.stripe.model.Address a = shipping.getAddress();
-        return Address.builder()
-                .recipientName(shipping.getName())
-                .line1(a.getLine1())
-                .line2(a.getLine2())
-                .city(a.getCity())
-                .state(a.getState())
-                .postalCode(a.getPostalCode())
-                .country(a.getCountry())
-                .phone(shipping.getPhone())
-                .build();
+        orderService.finalizeOrder(intent);
     }
 
     public void handlePaymentFailed(Event event) {
@@ -173,9 +128,11 @@ public class PaymentService {
         String intentId = order.getStripePaymentIntentId();
         if (intentId != null) {
             PaymentIntent pi = stripeService.cancelPaymentIntent(intentId);
-            // Stripe says it already succeeded — the money went through. Do NOT
-            // release stock; the payment_intent.succeeded webhook will finalize it.
-            if ("succeeded".equals(pi.getStatus())) return CancelOutcome.ALREADY_PAID;
+            if ("succeeded".equals(pi.getStatus())) {
+                // Payment already went through — finalize it now instead of waiting on the webhook.
+                orderService.finalizeOrder(pi);
+                return CancelOutcome.ALREADY_PAID;
+            }
         }
 
         orderService.cancelAndReleaseStock(orderId);

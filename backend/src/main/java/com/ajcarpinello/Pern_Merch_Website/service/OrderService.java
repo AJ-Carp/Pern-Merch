@@ -8,6 +8,8 @@ import com.ajcarpinello.Pern_Merch_Website.repository.CartItemRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.OrderRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.ProductVariantRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.UserRepository;
+import com.stripe.model.PaymentIntent;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -19,11 +21,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class OrderService {
 
+    private final CartService cartService;
     private final UserRepository userRepository;
     private final CartItemRepository cartItemRepository;
     private final OrderRepository orderRepository;
@@ -75,6 +80,49 @@ public class OrderService {
         order.setTotalAmount(priceSum);
         order.setStatus(OrderStatus.PENDING_PAYMENT);
         return orderRepository.save(order);
+    }
+
+    @Transactional
+    public void finalizeOrder(PaymentIntent intent) {
+        Order order = orderRepository.findByStripePaymentIntentId(intent.getId())
+                .orElseThrow(() -> new IllegalStateException("Order not found for PI: " + intent.getId()));
+
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) return; // order-level idempotency
+
+        // Shipping was attached to the PaymentIntent by the frontend's confirmPayment call
+        // (via the Stripe AddressElement). Snapshot it onto the order, and sync the user's
+        // default if it differs from what they just used.
+        Address shipping = toAddress(intent.getShipping());
+        if (shipping != null) {
+            order.setShippingAddress(shipping);
+            User user = order.getUser();
+            if (!Objects.equals(user.getDefaultShippingAddress(), shipping)) {
+                user.setDefaultShippingAddress(shipping);
+            }
+        } else {
+            log.warn("payment_intent.succeeded for PI {} arrived without shipping — order {} marked PAID with no address",
+                intent.getId(), order.getId());
+        }
+
+        order.setStatus(OrderStatus.PAID);
+        order.setPaidAt(LocalDateTime.now());
+        orderRepository.save(order);
+        cartService.clearCart(order.getUser().getUsername());
+    }
+
+    private Address toAddress(com.stripe.model.ShippingDetails shipping) {
+        if (shipping == null || shipping.getAddress() == null) return null;
+        com.stripe.model.Address a = shipping.getAddress();
+        return Address.builder()
+                .recipientName(shipping.getName())
+                .line1(a.getLine1())
+                .line2(a.getLine2())
+                .city(a.getCity())
+                .state(a.getState())
+                .postalCode(a.getPostalCode())
+                .country(a.getCountry())
+                .phone(shipping.getPhone())
+                .build();
     }
 
     /**
