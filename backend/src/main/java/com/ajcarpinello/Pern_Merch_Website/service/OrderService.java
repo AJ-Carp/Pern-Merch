@@ -3,6 +3,7 @@ package com.ajcarpinello.Pern_Merch_Website.service;
 import com.ajcarpinello.Pern_Merch_Website.dto.OrderDTO;
 import com.ajcarpinello.Pern_Merch_Website.dto.OrderItemDTO;
 import com.ajcarpinello.Pern_Merch_Website.entity.*;
+import com.ajcarpinello.Pern_Merch_Website.event.OrderPaidEvent;
 import com.ajcarpinello.Pern_Merch_Website.exception.AppException;
 import com.ajcarpinello.Pern_Merch_Website.repository.CartItemRepository;
 import com.ajcarpinello.Pern_Merch_Website.repository.OrderRepository;
@@ -11,6 +12,7 @@ import com.ajcarpinello.Pern_Merch_Website.repository.UserRepository;
 import com.stripe.model.PaymentIntent;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductVariantRepository variantRepository;
     private final UserService userService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // @Transactional ensures that saving the order and clearing the cart happen as an "all-or-nothing" operation.
     // If one step fails (e.g. database error), everything rolls back, preventing inconsistent states.
@@ -84,7 +87,9 @@ public class OrderService {
 
     @Transactional
     public void finalizeOrder(PaymentIntent intent) {
-        Order order = orderRepository.findByStripePaymentIntentId(intent.getId())
+        // Locked read: if a webhook and the sweeper/cancel path race, the second one blocks
+        // here, then sees PAID and bails on the guard below — so we finalize (and email) once.
+        Order order = orderRepository.findByStripePaymentIntentIdForUpdate(intent.getId())
                 .orElseThrow(() -> new IllegalStateException("Order not found for PI: " + intent.getId()));
 
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT) return; // order-level idempotency
@@ -108,6 +113,25 @@ public class OrderService {
         order.setPaidAt(LocalDateTime.now());
         orderRepository.save(order);
         cartService.clearCart(order.getUser().getUsername());
+
+        /* Build a full snapshot now, while the session is open, so the AFTER_COMMIT email
+           listener never has to touch lazy associations after this transaction closes. */
+        // collect info we need for emails and publish a event
+        // mailService is listening for this event
+        List<OrderPaidEvent.Line> lines = new ArrayList<>();
+        for (OrderItem item : order.getItems()) {
+            lines.add(new OrderPaidEvent.Line(
+                    item.getVariant().getProduct().getName(),
+                    item.getVariant().getSize(),
+                    item.getQuantity(),
+                    item.getPriceAtPurchase()));
+        }
+        eventPublisher.publishEvent(new OrderPaidEvent(
+                order.getId(),
+                order.getUser().getEmail(),
+                order.getTotalAmount(),
+                lines,
+                order.getShippingAddress()));
     }
 
     private Address toAddress(com.stripe.model.ShippingDetails shipping) {
