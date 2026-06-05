@@ -37,18 +37,4 @@ build/
 .DS_Store
 
 # notes
-deployment learning plan.png
-backend deployment.png
-deployment plan.png
-stripe-elements-checklist.md
-stripe_payment_flow.svg
-stripe-code-learning-guide.md
-merch-images
-revised-deployment-plan.md
-address-implementation-plan.md
-variants-implementation-plan.md
-product-soft-delete-implementation-plan.md
-KNOWN_ISSUES.md
-TODO.md
-email-implementation-plan.md
-ADMIN_ORDERS_PLAN.md
+notes/
