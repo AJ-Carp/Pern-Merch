@@ -4,6 +4,8 @@ import com.ajcarpinello.Pern_Merch_Website.entity.Order;
 import com.ajcarpinello.Pern_Merch_Website.entity.OrderStatus;
 import com.ajcarpinello.Pern_Merch_Website.entity.User;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -28,4 +30,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findFirstByUserAndStatusOrderByOrderDateDesc(User user, OrderStatus status);
 
     List<Order> findByStatusAndOrderDateBefore(OrderStatus status, LocalDateTime cutoff);
+
+    @Query("SELECT o FROM Order o WHERE o.status = :paidStatus OR o.status = :confirmedStatus ORDER BY o.paidAt ASC")
+    List<Order> findWorkingOrdersOrderByPaidAtAsc(OrderStatus paidStatus, OrderStatus confirmedStatus);
+
+    Page<Order> findByStatusOrderByPaidAtDesc(OrderStatus shippedStatus, Pageable pageable);
 }

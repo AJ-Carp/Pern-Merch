@@ -12,7 +12,11 @@ import com.ajcarpinello.Pern_Merch_Website.repository.UserRepository;
 import com.stripe.model.PaymentIntent;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -212,6 +216,32 @@ public class OrderService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
         return orderRepository.findFirstByUserAndStatusOrderByOrderDateDesc(user, OrderStatus.PENDING_PAYMENT);
+    }
+
+    public List<OrderDTO> getWorkingOrders() {
+        List<Order> orders = orderRepository.findWorkingOrdersOrderByPaidAtAsc(OrderStatus.PAID, OrderStatus.CONFIRMED);
+        List<OrderDTO> orderDTOS = new ArrayList<>();
+        for (Order order : orders) {
+            orderDTOS.add(toOrderDTO(order));
+        }
+        return orderDTOS;
+    }
+
+    public OrderDTO updateOrderStatus(Long orderId, OrderStatus status) {
+        if (status != OrderStatus.CONFIRMED && status != OrderStatus.SHIPPED) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Status can only be set to CONFIRMED or SHIPPED");
+        }
+        Order order = orderRepository
+                .findById(orderId).orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Order not found"));
+        order.setStatus(status);
+        return toOrderDTO(orderRepository.save(order));
+    }
+
+    public PagedModel<OrderDTO> getShippedOrders(int page) {
+        Pageable pageable = PageRequest.of(page, 20);
+        Page<Order> orderPage = orderRepository.findByStatusOrderByPaidAtDesc(OrderStatus.SHIPPED, pageable);
+        Page<OrderDTO> orderDtoPage = orderPage.map(this::toOrderDTO);
+        return new PagedModel<>(orderDtoPage);
     }
 
     public List<OrderDTO> getOrderHistory(String username) {

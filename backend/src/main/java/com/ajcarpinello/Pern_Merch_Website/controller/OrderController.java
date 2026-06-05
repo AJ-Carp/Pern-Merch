@@ -2,16 +2,21 @@ package com.ajcarpinello.Pern_Merch_Website.controller;
 
 import com.ajcarpinello.Pern_Merch_Website.dto.OrderDTO;
 import com.ajcarpinello.Pern_Merch_Website.dto.PaymentIntentResponse;
+import com.ajcarpinello.Pern_Merch_Website.entity.OrderStatus;
 import com.ajcarpinello.Pern_Merch_Website.service.OrderService;
 import com.ajcarpinello.Pern_Merch_Website.service.PaymentService;
 import com.stripe.exception.StripeException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
@@ -41,5 +46,20 @@ public class OrderController {
     @GetMapping
     public ResponseEntity<List<OrderDTO>> getOrderHistory(@AuthenticationPrincipal UserDetails userDetails) {
         return ResponseEntity.ok(orderService.getOrderHistory(userDetails.getUsername()));
+    }
+
+    @GetMapping("/workingOrders")
+    public ResponseEntity<List<OrderDTO>> getWorkingOrders() {
+        return ResponseEntity.ok(orderService.getWorkingOrders());
+    }
+
+    @PutMapping("/updateStatus/{orderId}")
+    public ResponseEntity<OrderDTO> updateStatus(@PathVariable Long orderId, @RequestBody OrderStatus status) {
+        return ResponseEntity.ok(orderService.updateOrderStatus(orderId, status));
+    }
+
+    @GetMapping("/shippedOrders/{page}")
+    public ResponseEntity<PagedModel<OrderDTO>> getShippedOrders(@PathVariable int page) {
+        return ResponseEntity.ok(orderService.getShippedOrders(page));
     }
 }
