@@ -171,6 +171,31 @@ export async function getOrders() {
   return handleResponse(res);
 }
 
+// ---- Orders (admin) ----
+
+// Work queue: PAID + CONFIRMED, oldest-first. Returns OrderDTO[].
+export async function getWorkingOrders() {
+  const res = await fetch(`${BASE_URL}/orders/workingOrders`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// SHIPPED history, newest-first, paginated. Returns a PagedModel: { content, page }.
+export async function getShippedOrders(page = 0) {
+  const res = await fetch(`${BASE_URL}/orders/shippedOrders/${page}`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// Advance an order's status. Body is a bare enum string, e.g. "SHIPPED".
+// Backend only allows CONFIRMED or SHIPPED. Returns the updated OrderDTO.
+export async function updateOrderStatus(id, status) {
+  const res = await fetch(`${BASE_URL}/orders/updateStatus/${id}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(status),
+  });
+  return handleResponse(res);
+}
+
 // ---- User ----
 
 export async function getDefaultAddress() {
