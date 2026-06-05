@@ -45,12 +45,12 @@ public class MailService {
         try {
             sendOrderConfirmation(event);
         } catch (Exception e) {
-            log.error("Failed to send customer confirmation for order {}", event.orderId(), e);
+            log.error("Failed to send customer confirmation for order {}", event.getOrderId(), e);
         }
         try {
             sendMerchantNotification(event);
         } catch (Exception e) {
-            log.error("Failed to send merchant notification for order {}", event.orderId(), e);
+            log.error("Failed to send merchant notification for order {}", event.getOrderId(), e);
         }
     }
 
@@ -58,19 +58,19 @@ public class MailService {
     public void sendOrderConfirmation(OrderPaidEvent order) {
         String body = "Thanks for your order!\n\n"
                 + orderSummary(order);
-        send(order.customerEmail(), "Order #" + order.orderId() + " confirmed", body);
+        send(order.getCustomerEmail(), "Order #" + order.getOrderId() + " confirmed", body);
     }
 
     /** New-order alert to the merchant so they know to fulfill it. */
     public void sendMerchantNotification(OrderPaidEvent order) {
         if (isBlank(merchantEmail)) {
-            log.warn("app.mail.merchant not set — skipping merchant notification for order {}", order.orderId());
+            log.warn("app.mail.merchant not set — skipping merchant notification for order {}", order.getOrderId());
             return;
         }
         String body = "New order received.\n\n"
-                + "Customer: " + order.customerEmail() + "\n\n"
+                + "Customer: " + order.getCustomerEmail() + "\n\n"
                 + orderSummary(order);
-        send(merchantEmail, "New order #" + order.orderId(), body);
+        send(merchantEmail, "New order #" + order.getOrderId(), body);
     }
 
     private void send(String to, String subject, String body) {
@@ -90,14 +90,14 @@ public class MailService {
 
     private String orderSummary(OrderPaidEvent order) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Order #").append(order.orderId()).append("\n\n");
-        for (OrderPaidEvent.Line line : order.items()) {
+        sb.append("Order #").append(order.getOrderId()).append("\n\n");
+        for (OrderPaidEvent.Line line : order.getItems()) {
             sb.append(String.format("  %s (%s) x%d — $%s%n",
-                    line.productName(), line.size(), line.quantity(), line.price()));
+                    line.getProductName(), line.getSize(), line.getQuantity(), line.getPrice()));
         }
-        sb.append("\nTotal: $").append(order.totalAmount()).append("\n");
+        sb.append("\nTotal: $").append(order.getTotalAmount()).append("\n");
 
-        Address a = order.shippingAddress();
+        Address a = order.getShippingAddress();
         if (a != null) {
             sb.append("\nShipping to:\n");
             sb.append("  ").append(a.getRecipientName()).append("\n");
