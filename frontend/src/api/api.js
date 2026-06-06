@@ -1,5 +1,4 @@
-//const BASE_URL = 'https://pe-caa7334a460c428f9116b67c92a1eda8.ecs.us-east-1.on.aws/api';
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 function getToken() {
   return localStorage.getItem('token');
