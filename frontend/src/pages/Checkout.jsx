@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { createPaymentIntent, getDefaultAddress } from '../api/api';
@@ -23,6 +24,11 @@ function toStripeDefaults(dto) {
 }
 
 export default function Checkout() {
+  const location = useLocation();
+  // The cart page creates the payment intent and passes the secret in, so a stock
+  // rejection stays on the cart. This is null on a direct visit / refresh — then we
+  // create it here (the backend reuses the pending order, so it's safe).
+  const passedClientSecret = location.state?.clientSecret || null;
   const [clientSecret, setClientSecret] = useState(null);
   const [defaultAddress, setDefaultAddress] = useState(null);
   const [ready, setReady] = useState(false);
@@ -33,7 +39,12 @@ export default function Checkout() {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
 
-    Promise.allSettled([createPaymentIntent(), getDefaultAddress()])
+    // Only create the intent here when the cart didn't already hand us one.
+    const intentPromise = passedClientSecret
+      ? Promise.resolve({ clientSecret: passedClientSecret })
+      : createPaymentIntent();
+
+    Promise.allSettled([intentPromise, getDefaultAddress()])
       .then(([piResult, addrResult]) => {
         if (piResult.status === 'rejected') {
           setError(piResult.reason?.message || 'Failed to start checkout');
@@ -45,7 +56,7 @@ export default function Checkout() {
         }
         setReady(true);
       });
-  }, []);
+  }, [passedClientSecret]);
 
   if (error) return <div className="section"><p className="error">{error}</p></div>;
   if (!ready) return <p className="loading-text">Loading payment...</p>;

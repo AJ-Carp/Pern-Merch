@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { getCart as fetchCart, addToCart as apiAddToCart, updateCartItem as apiUpdateCartItem, removeCartItem as apiRemoveCartItem } from '../api/api';
 import { useAuth } from './AuthContext';
 
@@ -8,6 +8,10 @@ export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
+  // Per-item debounce timers + latest intended quantity, so a flurry of +/- clicks
+  // updates the UI instantly but collapses into a single server sync.
+  const syncTimers = useRef({});
+  const pendingQty = useRef({});
 
   // Pass { silent: true } to refresh the cart without flipping the loading
   // flag — this avoids the whole cart unmounting/flashing after a mutation.
@@ -29,12 +33,31 @@ export function CartProvider({ children }) {
     await loadCart({ silent: true });
   }
 
-  async function updateQuantity(cartItemId, quantity) {
-    await apiUpdateCartItem(cartItemId, quantity);
-    await loadCart({ silent: true });
+  // Optimistic, debounced quantity change. The displayed number updates immediately
+  // (clamped to [1, stock]); the server sync is deferred so rapid clicks fire once.
+  // On rejection we roll back to the server's truth and surface the error.
+  function changeItemQuantity(cartItemId, delta) {
+    setCartItems(prev => prev.map(item => {
+      if (item.id !== cartItemId) return item;
+      const next = Math.max(1, Math.min(item.quantity + delta, item.stockQuantity));
+      pendingQty.current[cartItemId] = next;
+      return { ...item, quantity: next };
+    }));
+
+    clearTimeout(syncTimers.current[cartItemId]);
+    syncTimers.current[cartItemId] = setTimeout(async () => {
+      try {
+        await apiUpdateCartItem(cartItemId, pendingQty.current[cartItemId]);
+      } catch (err) {
+        await loadCart({ silent: true });
+        alert(err.message);
+      }
+    }, 450);
   }
 
   async function removeItem(cartItemId) {
+    // Cancel any pending quantity sync so it can't fire after the item is gone.
+    clearTimeout(syncTimers.current[cartItemId]);
     await apiRemoveCartItem(cartItemId);
     await loadCart({ silent: true });
   }
@@ -46,7 +69,7 @@ export function CartProvider({ children }) {
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ cartItems, cartCount, loading, loadCart, addToCart, updateQuantity, removeItem, clearLocalCart }}>
+    <CartContext.Provider value={{ cartItems, cartCount, loading, loadCart, addToCart, changeItemQuantity, removeItem, clearLocalCart }}>
       {children}
     </CartContext.Provider>
   );

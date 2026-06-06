@@ -1,11 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { createPaymentIntent } from '../api/api';
 import { isOneSize } from '../utils/size';
 
 export default function Cart() {
-  const { cartItems, cartCount, loading, loadCart, updateQuantity, removeItem } = useCart();
+  const { cartItems, cartCount, loading, loadCart, changeItemQuantity, removeItem } = useCart();
   const navigate = useNavigate();
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [checkoutError, setCheckoutError] = useState(null);
 
   useEffect(() => {
     loadCart();
@@ -13,16 +16,19 @@ export default function Cart() {
 
   const total = cartItems.reduce((sum, item) => sum + item.productPrice * item.quantity, 0);
 
-  async function handleUpdateQuantity(cartItemId, quantity) {
-    try {
-      await updateQuantity(cartItemId, quantity);
-    } catch (err) {
-      alert(err.message);
-    }
-  }
-
+  // Start checkout from here so a stock rejection keeps the user on the cart
+  // (with a refreshed stock view) instead of stranding them on the checkout page.
   async function handleCheckout() {
-    navigate('/checkout');
+    setCheckingOut(true);
+    setCheckoutError(null);
+    try {
+      const { clientSecret } = await createPaymentIntent();
+      navigate('/checkout', { state: { clientSecret } });
+    } catch (err) {
+      setCheckoutError(err.message);
+      await loadCart({ silent: true });
+      setCheckingOut(false);
+    }
   }
 
   if (loading) return <p className="loading-text">Loading cart...</p>;
@@ -48,9 +54,9 @@ export default function Cart() {
                   <span className="cart-item-price">${item.productPrice?.toFixed(2)}</span>
                 </div>
                 <div className="cart-item-actions">
-                  <button className="qty-btn" onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}>-</button>
+                  <button className="qty-btn" onClick={() => changeItemQuantity(item.id, -1)} disabled={item.quantity <= 1}>-</button>
                   <span className="qty-value">{item.quantity}</span>
-                  <button className="qty-btn" onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)} disabled={item.quantity >= item.stockQuantity}>+</button>
+                  <button className="qty-btn" onClick={() => changeItemQuantity(item.id, 1)} disabled={item.quantity >= item.stockQuantity}>+</button>
                   <button className="btn btn-danger btn-sm" onClick={() => removeItem(item.id)}>Remove</button>
                 </div>
               </div>
@@ -62,8 +68,9 @@ export default function Cart() {
               <span>Total:</span>
               <span className="cart-total-price">${total.toFixed(2)}</span>
             </div>
-            <button className="btn btn-primary btn-lg" onClick={handleCheckout}>
-              Checkout
+            {checkoutError && <p className="error" style={{ marginBottom: 12 }}>{checkoutError}</p>}
+            <button className="btn btn-primary btn-lg" onClick={handleCheckout} disabled={checkingOut}>
+              {checkingOut ? 'Starting checkout...' : 'Checkout'}
             </button>
           </div>
         </>

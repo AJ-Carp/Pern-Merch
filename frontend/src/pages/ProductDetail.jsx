@@ -14,6 +14,7 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState(null);
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     getProduct(id)
@@ -30,6 +31,14 @@ export default function ProductDetail() {
   const selectedVariant = variants.find(v => v.id === selectedVariantId) || null;
   // Hide the size selector for single one-size variants ("Adjustable").
   const oneSize = variants.length === 1 && isOneSize(variants[0].size);
+  // Cap quantity at the selected variant's stock (no limit until a size is picked).
+  const maxQuantity = selectedVariant?.stockQuantity ?? Infinity;
+
+  // Switching sizes can lower the available stock, so clamp the quantity down to fit.
+  function selectVariant(variant) {
+    setSelectedVariantId(variant.id);
+    setQuantity(q => Math.min(q, variant.stockQuantity));
+  }
 
   async function handleAddToCart() {
     if (!user) {
@@ -39,7 +48,7 @@ export default function ProductDetail() {
     if (!selectedVariant) return;
     setAdding(true);
     try {
-      await addToCart(selectedVariant.id);
+      await addToCart(selectedVariant.id, quantity);
       alert('Added to cart!');
     } catch (err) {
       alert(err.message);
@@ -83,7 +92,7 @@ export default function ProductDetail() {
                     type="button"
                     className={`size-option ${selectedVariantId === v.id ? 'active' : ''}`}
                     disabled={v.stockQuantity === 0}
-                    onClick={() => setSelectedVariantId(v.id)}
+                    onClick={() => selectVariant(v)}
                   >
                     {v.size}{v.stockQuantity === 0 ? ' (Sold out)' : ''}
                   </button>
@@ -91,6 +100,29 @@ export default function ProductDetail() {
               </div>
             </div>
           )}
+
+          <div className="quantity-selector">
+            <p className="quantity-selector-label">Quantity:</p>
+            <div className="quantity-controls">
+              <button
+                type="button"
+                className="quantity-btn"
+                onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                disabled={quantity <= 1}
+              >
+                −
+              </button>
+              <span className="quantity-value">{quantity}</span>
+              <button
+                type="button"
+                className="quantity-btn"
+                onClick={() => setQuantity(q => Math.min(maxQuantity, q + 1))}
+                disabled={quantity >= maxQuantity}
+              >
+                +
+              </button>
+            </div>
+          </div>
 
           <button
             className="btn btn-primary btn-lg"
