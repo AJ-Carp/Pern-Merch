@@ -2,7 +2,7 @@
 
 An e-commerce site for my band PERN, not the tech stack (sorry to disappoint). This is where fans can browse and buy official merch, and where I manage orders and inventory behind the scenes.
 
-Check out the live site: [pernmerch.com](https://pernmerch.com/)
+Check out the live site: <a href="https://pernmerch.com/" target="_blank" rel="noopener noreferrer">pernmerch.com</a>
 
 A full-stack storefront with real Stripe payments, inventory management, and an admin dashboard. The backend is where most of the engineering lives: it's built around the hard parts of a payment system, like idempotency, concurrency, and consistency between a local database and an external payment provider.
 
