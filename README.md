@@ -1,4 +1,4 @@
-# PERN Merch
+# PERN Merch 🎸
 
 An e-commerce site for my band PERN, not the tech stack (sorry to disappoint). This is where fans can browse and buy official merch, and where I manage orders and inventory behind the scenes.
 
@@ -37,6 +37,56 @@ Stripe checkout is built to handle the ways payments fail, not just the success 
 - **Saga / compensating transactions** — if creating the Stripe intent fails after stock has already been reserved, the reservation is rolled back (stock released, order cancelled) so inventory never silently leaks ([PaymentService.java](backend/src/main/java/com/ajcarpinello/Pern_Merch_Website/service/PaymentService.java)).
 - **Stripe-first cancellation** — cancelling an order cancels the PaymentIntent *before* releasing stock; if Stripe reports the payment actually succeeded in that window, the order is finalized instead of wrongly cancelled.
 - **API-version-tolerant deserialization** — webhook payloads are deserialized the safe way first, falling back (with a warning) when the account's Stripe API version drifts from the library's.
+
+The flow splits into two phases: checkout is synchronous (the browser drives it), while payment confirmation arrives asynchronously through a Stripe webhook, decoupled from the original request.
+
+**Phase 1 — Initiate checkout (synchronous)**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Browser (React + Stripe.js)
+    participant OC as OrderController
+    participant PS as PaymentService
+    participant OS as OrderService
+    participant DB as Postgres
+    participant ST as Stripe
+
+    U->>OC: POST /api/orders/checkout
+    OC->>PS: initiateCheckout(username)
+    PS->>OS: createPendingOrder(username)
+    OS->>DB: lock stock (SELECT ... FOR UPDATE), decrement, save PENDING order
+    OS-->>PS: order
+    PS->>ST: create PaymentIntent (idempotent)
+    Note over PS,ST: if this fails, release stock + cancel order
+    ST-->>PS: clientSecret
+    PS-->>OC: clientSecret + orderId
+    OC-->>U: 200 { clientSecret, orderId }
+    U->>ST: confirmPayment(card + shipping address)
+```
+
+**Phase 2 — Payment confirmation via webhook (asynchronous)**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant ST as Stripe
+    participant WH as StripeWebhookController
+    participant PS as PaymentService
+    participant OS as OrderService
+    participant DB as Postgres
+    participant ML as MailService
+
+    ST->>WH: webhook: payment_intent.succeeded
+    Note over WH: verify signature, skip if already processed
+    WH->>PS: handlePaymentSucceeded(event)
+    PS->>OS: finalizeOrder(intent)
+    Note over OS: locked read, runs once (guard: PENDING_PAYMENT)
+    OS->>DB: mark PAID, save address, clear cart
+    OS-)ML: publish OrderPaidEvent (after commit, async)
+    WH-->>ST: 200 OK
+    ML->>ML: send confirmation emails (SMTP)
+```
 
 ### Concurrency & inventory integrity
 The classic e-commerce race — two people buying the last shirt — is handled with **pessimistic row locks** (`SELECT ... FOR UPDATE`) on the product variant during checkout, so two concurrent transactions can't both pass the stock check and oversell ([ProductVariantRepository.java](backend/src/main/java/com/ajcarpinello/Pern_Merch_Website/repository/ProductVariantRepository.java)). The same locking strategy guards order finalization ([OrderRepository.java](backend/src/main/java/com/ajcarpinello/Pern_Merch_Website/repository/OrderRepository.java)) so concurrent code paths serialize instead of double-finalizing.
