@@ -2,7 +2,7 @@
 
 An e-commerce site for my band PERN, not the tech stack (sorry to disappoint). This is where fans can browse and buy official merch, and where I manage orders and inventory behind the scenes.
 
-Check out the live site: <a href="https://pernmerch.com/" target="_blank" rel="noopener noreferrer">pernmerch.com</a>
+Check out the live site: [pernmerch.com](https://pernmerch.com/)
 
 A full-stack storefront with real Stripe payments, inventory management, and an admin dashboard. The backend is where most of the engineering lives: it's built around the hard parts of a payment system, like idempotency, concurrency, and consistency between a local database and an external payment provider.
 
@@ -18,21 +18,7 @@ A full-stack storefront with real Stripe payments, inventory management, and an 
 
 ## Architecture
 
-```
-[ User ]                                   [ Stripe ]
-   |                                           |
-   | browser                                   | webhook (inbound):
-   v                                           | payment lifecycle events
-[ CloudFront ]                                 |
-   |                                           |
-   |-- /        --> [ S3: React SPA ]          |
-   |                                           v
-   |-- /api/*   --> [ Lightsail Container: Spring Boot ]
-                          |
-                          |--> [ Neon Postgres ]
-                          |--> [ Stripe API ]  (outbound: create/cancel PaymentIntents)
-                          |--> [ SMTP (order emails) ]
-```
+![PERN Merch architecture — CloudFront routes `/` to a React SPA on S3 and `/api/*` to a Spring Boot backend on Lightsail, which talks to Neon Postgres, Stripe (outbound API + inbound webhooks), and SMTP for order emails](docs/images/architecture.jpg)
 
 The Spring Boot service is a stateless REST API (no server-side sessions — auth is carried entirely in JWTs), which lets it scale horizontally and run comfortably in a 512 MB container.
 
@@ -40,10 +26,8 @@ The Spring Boot service is a stateless REST API (no server-side sessions — aut
 
 ## Backend Engineering Highlights
 
-This is the part I'd point a reviewer to. Each item below is solving a real correctness problem, not just wiring CRUD endpoints.
-
-### Payments built for correctness, not the happy path
-Stripe checkout is implemented with the failure modes treated as first-class:
+### Payment processing & reliability
+Stripe checkout is built to handle the ways payments fail, not just the success case:
 
 - **Webhook signature verification** — every Stripe event is verified against the signing secret before it's trusted ([StripeWebhookController.java](backend/src/main/java/com/ajcarpinello/Pern_Merch_Website/controller/StripeWebhookController.java)).
 - **Idempotency at three layers** so a payment is never double-counted, even though Stripe retries webhooks until it gets a 2xx/4xx:
@@ -82,6 +66,20 @@ Stateless JWT auth implemented from the primitives: a custom `OncePerRequestFilt
 
 ### API design & error handling
 A `@RestControllerAdvice` translates exceptions into consistent JSON error bodies, maps a custom `AppException` to the right HTTP status, and deliberately **does not leak internal exception details** on unexpected 500s ([GlobalExceptionHandler.java](backend/src/main/java/com/ajcarpinello/Pern_Merch_Website/controller/GlobalExceptionHandler.java)). Admin order history is **paginated** via Spring Data `PagedModel`. A DTO layer keeps JPA entities out of the API contract.
+
+---
+
+## Admin Dashboard
+
+A role-gated panel at `/admin` for running the store — managing the catalog and pushing orders through fulfillment. Access is enforced in **two independent places**: the React route is wrapped in an admin-only guard, *and* every admin endpoint separately requires the `ADMIN` role server-side — so the UI guard is just convenience, not the security boundary ([ProtectedRoute.jsx](frontend/src/components/ProtectedRoute.jsx), [SecurityConfig.java](backend/src/main/java/com/ajcarpinello/Pern_Merch_Website/config/SecurityConfig.java)). It's split into three tabs ([Admin.jsx](frontend/src/pages/Admin.jsx)):
+
+![PERN Merch admin panel — Products tab](docs/images/admin-products.png)
+
+- **Products** — full catalog CRUD plus per-product variant (size/stock) management ([AdminProducts.jsx](frontend/src/pages/AdminProducts.jsx)). Stock is edited inline per size, and the variant layer enforces integrity: duplicate sizes are rejected (409), and a variant can't be deleted while it's referenced by an existing order or sitting in a customer's cart. Deleting a product is a soft delete that also clears it from any carts, so historical orders keep valid references.
+
+- **Open Orders** — the fulfillment work queue: every `PAID` and `CONFIRMED` order, oldest-first, so orders are worked FIFO ([AdminOrders.jsx](frontend/src/pages/AdminOrders.jsx)). Each one advances along a fixed ladder — `PAID → CONFIRMED → SHIPPED` — surfaced as a single next-step button; once shipped it drops off the queue. The backend only honors those two forward transitions and rejects anything else, so order status can't be set arbitrarily from the client. Rows expand to show line items (with price-at-purchase) and the shipping address.
+
+- **Shipped Orders** — a read-only, newest-first history of shipped orders, paginated server-side (20 per page via Spring Data `PagedModel`), with the same expandable detail view.
 
 ---
 
