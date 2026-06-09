@@ -1,4 +1,4 @@
-# PERN Merch
+# PERN Merch 🎸
 
 An e-commerce site for my band PERN, not the tech stack (sorry to disappoint). This is where fans can browse and buy official merch, and where I manage orders and inventory behind the scenes.
 
