@@ -30,10 +30,10 @@ The Spring Boot service is a stateless REST API (no server-side sessions — aut
 Stripe checkout is built to handle the ways payments fail, not just the success case:
 
 - **Webhook signature verification** — every Stripe event is verified against the signing secret before it's trusted ([StripeWebhookController.java](backend/src/main/java/com/ajcarpinello/Pern_Merch_Website/controller/StripeWebhookController.java)).
-- **Idempotency at three layers** so a payment is never double-counted, even though Stripe retries webhooks until it gets a 2xx/4xx:
+- **Idempotency at three layers** so a payment is never double-counted, even though Stripe retries webhooks until it gets a 2xx:
   1. **Stripe idempotency keys** on PaymentIntent creation, so a retried checkout returns the same intent instead of charging twice ([StripeService.java](backend/src/main/java/com/ajcarpinello/Pern_Merch_Website/service/StripeService.java)).
   2. A **processed-event dedup table** — every handled `event.id` is recorded, and repeat deliveries short-circuit ([PaymentService.java](backend/src/main/java/com/ajcarpinello/Pern_Merch_Website/service/PaymentService.java)).
-  3. **Order-level status guards** — `finalizeOrder` bails unless the order is still `PENDING_PAYMENT`, so the success webhook, the abandoned-order sweeper, and the user's cancel button can all race and the order is still finalized exactly once.
+  3. **Locked read + status guard** — `finalizeOrder` opens with a pessimistic row lock (`SELECT ... FOR UPDATE`), then bails unless the order is still `PENDING_PAYMENT`. So when the success webhook, the sweeper, and the cancel button race, they serialize on the row: the first finalizes, the rest block, then see `PAID` and bail — finalized (and emailed) exactly once. The lock is doing the work here; the guard alone wouldn't stop a double-finalize ([OrderRepository.java](backend/src/main/java/com/ajcarpinello/Pern_Merch_Website/repository/OrderRepository.java)).
 - **Saga / compensating transactions** — if creating the Stripe intent fails after stock has already been reserved, the reservation is rolled back (stock released, order cancelled) so inventory never silently leaks ([PaymentService.java](backend/src/main/java/com/ajcarpinello/Pern_Merch_Website/service/PaymentService.java)).
 - **Stripe-first cancellation** — cancelling an order cancels the PaymentIntent *before* releasing stock; if Stripe reports the payment actually succeeded in that window, the order is finalized instead of wrongly cancelled.
 - **API-version-tolerant deserialization** — webhook payloads are deserialized the safe way first, falling back (with a warning) when the account's Stripe API version drifts from the library's.
@@ -99,8 +99,6 @@ Order confirmation and merchant-notification emails fire from a `@TransactionalE
 - emails only send **after** the order actually commits (no "your order is confirmed" for a transaction that rolled back),
 - the webhook thread returns immediately instead of blocking on SMTP,
 - the email payload is **snapshotted while the JPA session is open**, avoiding lazy-loading exceptions after the transaction closes ([MailService.java](backend/src/main/java/com/ajcarpinello/Pern_Merch_Website/service/MailService.java), [OrderService.java](backend/src/main/java/com/ajcarpinello/Pern_Merch_Website/service/OrderService.java)).
-
-Mail is provider-agnostic SMTP, resolved lazily so it's simply skipped (not broken) when unconfigured in local dev.
 
 ### Scheduled background reclamation
 Stripe never auto-cancels a standalone PaymentIntent, and there's no "customer walked away" webhook — so abandoned checkouts would silently hold inventory forever. A `@Scheduled` sweeper reclaims stock and cancels the intent for orders left pending past a configurable TTL, with per-order error isolation so one bad order doesn't abort the batch ([AbandonedOrderSweeper.java](backend/src/main/java/com/ajcarpinello/Pern_Merch_Website/service/AbandonedOrderSweeper.java)).
