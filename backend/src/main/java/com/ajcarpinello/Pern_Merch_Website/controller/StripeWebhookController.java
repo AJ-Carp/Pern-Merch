@@ -33,7 +33,7 @@ public class StripeWebhookController {
             return ResponseEntity.status(400).body("Invalid signature");
         }
 
-        // stripe will keep sending the webhook over again unitl it gets a 200 or 400
+        // stripe will keep sending the webhook over again unitl it gets a 200
         if (paymentService.isEventProcessed(event.getId())) {
             return ResponseEntity.ok("Already processed");
         }
