@@ -1,6 +1,6 @@
 package com.ajcarpinello.Pern_Merch_Website.entity;
 
-/* The UserPrincipal class acts as a metadata wrapper for your user—it adapts your database
+/* The CustomUserDetails class acts as a metadata wrapper for your user—it adapts your database
    User entity to Spring Security's UserDetails interface. It provides Spring Security with
    information about the user's credentials, username, authorities (roles), and account status,
    so the framework can handle authentication and authorization properly.
@@ -9,7 +9,6 @@ package com.ajcarpinello.Pern_Merch_Website.entity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-
 import java.util.Collection;
 import java.util.Collections;
 

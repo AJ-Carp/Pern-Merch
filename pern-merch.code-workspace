@@ -1,7 +1,6 @@
 {
   "folders": [
-    { "path": "." },
-    { "path": "backend" }
+    { "path": "." }
   ],
   "settings": {
     "java.project.sourcePaths": ["backend/src/main/java"],
