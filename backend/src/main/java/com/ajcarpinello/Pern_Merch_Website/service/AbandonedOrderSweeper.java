@@ -29,7 +29,8 @@ public class AbandonedOrderSweeper {
     @Value("${checkout.expiry-minutes:30}")
     private long expiryMinutes;
 
-    @Scheduled(fixedDelayString = "${checkout.sweep-interval-ms:60000}")
+    // interval increased to reduce Neon usage
+    @Scheduled(fixedDelayString = "${checkout.sweep-interval-ms:86400000}")
     public void sweepAbandonedOrders() {
         LocalDateTime cutoff = LocalDateTime.now().minusMinutes(expiryMinutes);
         List<Order> stale = orderRepository.findByStatusAndOrderDateBefore(OrderStatus.PENDING_PAYMENT, cutoff);
