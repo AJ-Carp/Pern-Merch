@@ -95,7 +95,7 @@ public class PaymentService {
     private PaymentIntent extractIntent(Event event) {
         EventDataObjectDeserializer deserializer = event.getDataObjectDeserializer();
         if (deserializer.getObject().isPresent()) {
-            return (PaymentIntent)deserializer.getObject().get();
+            return (PaymentIntent) deserializer.getObject().get();
         }
         // Safe deserialize failed → account/endpoint API version differs from stripe-java's
         // (2026-03-25.dahlia). Force it; the fields we use (id, status, shipping) are stable.

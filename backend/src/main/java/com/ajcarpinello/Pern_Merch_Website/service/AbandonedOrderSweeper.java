@@ -6,6 +6,7 @@ import com.ajcarpinello.Pern_Merch_Website.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
@@ -16,8 +17,14 @@ import java.util.List;
  * started but never paid. This is the only terminal-cleanup path for abandoned
  * orders: Stripe never auto-cancels a standalone PaymentIntent, and there is no
  * webhook for "customer walked away".
+ *
+ * Disabled by default so the scheduled query never wakes the Neon free-tier DB
+ * out of auto-suspend. Set checkout.sweeper-enabled=true to turn it back on;
+ * while off, abandoned PENDING_PAYMENT orders keep their reserved stock and
+ * their PaymentIntents stay open until cleaned up manually.
  */
 @Component
+@ConditionalOnProperty(name = "checkout.sweeper-enabled", havingValue = "true")
 @Slf4j
 @RequiredArgsConstructor
 public class AbandonedOrderSweeper {
@@ -30,7 +37,7 @@ public class AbandonedOrderSweeper {
     private long expiryMinutes;
 
     // interval increased to reduce Neon usage
-    @Scheduled(fixedDelayString = "${checkout.sweep-interval-ms:86400000}")
+    @Scheduled(fixedDelayString = "${checkout.sweep-interval-ms:86400000}") // once per day
     public void sweepAbandonedOrders() {
         LocalDateTime cutoff = LocalDateTime.now().minusMinutes(expiryMinutes);
         List<Order> stale = orderRepository.findByStatusAndOrderDateBefore(OrderStatus.PENDING_PAYMENT, cutoff);
