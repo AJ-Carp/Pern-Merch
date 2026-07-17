@@ -131,7 +131,7 @@ A role-gated panel at `/admin` for running the store — managing the catalog an
 
 ---
 
-## API Surface (selected)
+## API Surface
 
 | Method | Endpoint | Access | Purpose |
 |---|---|---|---|
